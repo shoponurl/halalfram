@@ -47,7 +47,9 @@ final class RecordWeight extends Action
             $event->save();
 
             $item->actual_weight_lb = $weight;
-            $item->final_cents = CatchWeightPricing::lineCents($item->price_per_lb_cents, $weight);
+            // The per-piece cut/offal/packing surcharge (Sprint 02) is flat, not weight-scaled — same
+            // treatment as the estimate in QuoteCart, so a weighed order never quietly drops the surcharge.
+            $item->final_cents = CatchWeightPricing::lineCents($item->price_per_lb_cents, $weight) + $item->optionSurchargeCents() * $item->quantity;
             $item->save();
 
             return $event;

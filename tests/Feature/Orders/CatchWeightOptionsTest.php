@@ -2,9 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Actions\Orders\FinalizeOrder;
+use App\Actions\Orders\MarkOrderAuthorized;
 use App\Actions\Orders\PlaceOrder;
 use App\Actions\Orders\QuoteCart;
+use App\Actions\Orders\RecordWeight;
+use App\Enums\Role;
+use App\Enums\WeightSource;
 use App\Support\CartLine;
+use App\Support\SettlementPlan;
+use App\Support\Weight;
 use Illuminate\Validation\ValidationException;
 
 /*
@@ -13,7 +20,7 @@ use Illuminate\Validation\ValidationException;
  */
 
 beforeEach(function () {
-    fakePayments();
+    $this->gateway = fakePayments();
     $this->category = category('Goat');
     $this->product = product(priceCents: 899, estLb: '2.000', category: $this->category);   // 899 × 2 = 1798/piece
 });
@@ -98,6 +105,33 @@ it('rejects cut/offal options on a product whose category does not offer them', 
 
     $line = new CartLine($plainProduct->id, 1, $cut->id);
     expect(fn () => app(QuoteCart::class)->handle([$line->key() => $line->toArray()]))->toThrow(ValidationException::class);
+});
+
+it('charges the option surcharge on the actual weight, not just the estimate (regression: it must not be dropped at settlement)', function () {
+    $cut = cutOption($this->category, 'Boneless', extraPriceCents: 400);
+    $line = new CartLine($this->product->id, 1, $cut->id);
+    $rawLines = [$line->key() => $line->toArray()];
+    $quote = app(QuoteCart::class)->handle($rawLines);
+
+    ['order' => $order] = app(PlaceOrder::class)->handle(
+        lines: $rawLines,
+        customer: ['customer_name' => 'A', 'customer_email' => 'a@example.com', 'customer_phone' => '2675550123'],
+        expectedHoldCents: $quote['hold_cents'],
+    );
+    $intent = $this->gateway->authorize($order->stripe_payment_intent_id);
+    app(MarkOrderAuthorized::class)->handle($order, $intent);
+    $order = $order->fresh();
+
+    // Weighed at exactly the estimate, so only the surcharge should distinguish final from base price
+    app(RecordWeight::class)->handle($order->items->first(), Weight::pounds('2.000'), WeightSource::Manual, staff(Role::Butcher));
+    $order = $order->fresh(['items']);
+
+    // base 1798 + cut 400 = 2198
+    expect($order->items->first()->final_cents)->toBe(2198);
+
+    $plan = app(FinalizeOrder::class)->handle($order, staff(Role::FrontDesk));
+    expect($plan->action)->toBe(SettlementPlan::CAPTURE)
+        ->and($plan->finalCents)->toBe(2198);
 });
 
 it('keeps Sprint 01 simple carts (no options) working exactly as before', function () {
