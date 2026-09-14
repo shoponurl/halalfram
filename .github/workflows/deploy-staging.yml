@@ -1,0 +1,26 @@
+name: Deploy staging
+
+# Auto-deploy to the Forge staging site after CI passes on main.
+# Setup: Forge → staging site → Deployments → copy "Deployment Trigger URL"
+#        GitHub → Settings → Secrets → Actions → add FORGE_STAGING_DEPLOY_URL
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Trigger Forge deployment
+        env:
+          FORGE_STAGING_DEPLOY_URL: ${{ secrets.FORGE_STAGING_DEPLOY_URL }}
+        run: |
+          test -n "$FORGE_STAGING_DEPLOY_URL" || { echo "::error::FORGE_STAGING_DEPLOY_URL secret is not set"; exit 1; }
+          curl --fail --silent --show-error -X POST "$FORGE_STAGING_DEPLOY_URL&forge_deploy_commit=${{ github.event.workflow_run.head_sha }}"

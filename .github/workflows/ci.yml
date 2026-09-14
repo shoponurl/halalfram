@@ -1,0 +1,97 @@
+name: CI
+
+# Merge gate (guideline ch. 5, layer 2). Every job must pass before a PR can merge into main.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PHP_VERSION: '8.4'
+
+jobs:
+  lint:
+    name: Pint (code style)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with: { php-version: '${{ env.PHP_VERSION }}', tools: composer:v2, coverage: none }
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: vendor/bin/pint --test
+
+  static:
+    name: Larastan (level 8)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with: { php-version: '${{ env.PHP_VERSION }}', tools: composer:v2, coverage: none, extensions: intl, bcmath }
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+
+  tests:
+    name: Pest (unit, arch/security rules, feature)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: halal_farm_store_test
+        ports: ['3306:3306']
+        options: --health-cmd="mysqladmin ping -proot" --health-interval=10s --health-timeout=5s --health-retries=5
+    env:
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: halal_farm_store_test
+      DB_USERNAME: root
+      DB_PASSWORD: root
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with: { php-version: '${{ env.PHP_VERSION }}', tools: composer:v2, coverage: none, extensions: intl, bcmath, pdo_mysql }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: npm ci && npm run build
+      - run: cp .env.example .env && php artisan key:generate
+      - run: vendor/bin/pest --ci
+
+  secrets:
+    name: gitleaks (no secrets in commits)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  dependencies:
+    name: composer audit + npm audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with: { php-version: '${{ env.PHP_VERSION }}', tools: composer:v2, coverage: none }
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: composer audit --locked
+      - run: npm audit --audit-level=high --omit=dev
+
+  semgrep:
+    name: semgrep (injection, mass assignment, unsafe functions)
+    runs-on: ubuntu-latest
+    container: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - run: semgrep scan --config .semgrep/ --config p/php --error --exclude vendor --exclude node_modules --exclude tests

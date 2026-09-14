@@ -1,0 +1,71 @@
+# Project rules for the security gaps in the business guideline, chapter 5.
+# Pest's tests/Arch/SecurityRulesTest.php enforces the same rules locally; semgrep catches variations regex can't.
+rules:
+  - id: eloquent-guarded-empty
+    languages: [php]
+    severity: ERROR
+    message: "Gap 03 mass assignment: `$guarded = []` makes every column writable from a form post. Declare $fillable."
+    pattern: |
+      class $C { ... protected $guarded = []; ... }
+
+  - id: eloquent-unguard
+    languages: [php]
+    severity: ERROR
+    message: "Gap 03 mass assignment: never unguard models."
+    pattern-either:
+      - pattern: Model::unguard(...)
+      - pattern: $M->unguard(...)
+
+  - id: request-all-into-model-or-log
+    languages: [php]
+    severity: ERROR
+    message: "Gap 03/09: pass $request->validated(), never $request->all() — to models, jobs or logs."
+    pattern-either:
+      - pattern: $request->all()
+      - pattern: request()->all()
+      - pattern: Request::all()
+
+  - id: raw-sql-with-user-input
+    languages: [php]
+    severity: ERROR
+    message: "Gap 06 SQL injection: interpolated input in a raw query. Use bindings and a column allowlist."
+    patterns:
+      - pattern-either:
+          - pattern: DB::raw($ARG)
+          - pattern: $Q->selectRaw($ARG, ...)
+          - pattern: $Q->whereRaw($ARG, ...)
+          - pattern: $Q->orWhereRaw($ARG, ...)
+          - pattern: $Q->havingRaw($ARG, ...)
+          - pattern: $Q->orderByRaw($ARG, ...)
+          - pattern: $Q->groupByRaw($ARG, ...)
+      # Anything other than a plain constant string (variables, interpolation, concatenation) is flagged
+      - metavariable-regex:
+          metavariable: $ARG
+          regex: .*\$.*
+
+  - id: price-from-request
+    languages: [php]
+    severity: ERROR
+    message: "Gap 02: amounts and prices are recalculated on the server, never read from the request."
+    pattern-either:
+      - pattern: "['amount' => $REQ->$F(...), ...]"
+      - pattern: "['price' => $REQ->$F(...), ...]"
+      - pattern: "['total' => $REQ->$F(...), ...]"
+
+  - id: client-original-filename
+    languages: [php]
+    severity: ERROR
+    message: "Gap 07 uploads: store under a random name in private storage; never trust the client filename or MIME type."
+    pattern: $FILE->getClientOriginalName()
+
+  - id: stripe-webhook-without-signature
+    languages: [php]
+    severity: ERROR
+    message: "Gap 04: parse Stripe webhooks with \\Stripe\\Webhook::constructEvent($payload, $sigHeader, $secret)."
+    patterns:
+      - pattern: json_decode($REQ->getContent(), ...)
+      - pattern-inside: |
+          class $C { ... function $M(...) { ... } ... }
+      - metavariable-regex:
+          metavariable: $C
+          regex: (?i).*webhook.*

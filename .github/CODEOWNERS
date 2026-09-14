@@ -1,0 +1,36 @@
+# Mandatory senior review (guideline ch. 5, layer 3).
+# Replace @halal-brothers/senior-devs with your real GitHub team or usernames, then enable
+# "Require review from Code Owners" in the branch protection rule for `main`.
+
+# Default: any change needs a review
+*                                   @halal-brothers/senior-devs
+
+# Authorization: policies, middleware, roles and the admin panel's access rules
+/app/Policies/                      @halal-brothers/senior-devs
+/app/Http/Middleware/               @halal-brothers/senior-devs
+/app/Enums/Role.php                 @halal-brothers/senior-devs
+/app/Enums/Permission.php           @halal-brothers/senior-devs
+/app/Models/User.php                @halal-brothers/senior-devs
+/app/Providers/                     @halal-brothers/senior-devs
+
+# Money, weight, payments, webhooks, invoices, catch-weight and hissa logic
+/app/Support/                       @halal-brothers/senior-devs
+/app/Casts/                         @halal-brothers/senior-devs
+/app/Actions/                       @halal-brothers/senior-devs
+/app/**/Payment*                    @halal-brothers/senior-devs
+/app/**/*Webhook*                   @halal-brothers/senior-devs
+/app/**/Invoice*                    @halal-brothers/senior-devs
+
+# Migrations can change money, weight or permission columns
+/database/migrations/               @halal-brothers/senior-devs
+
+# Secrets shape, deploy and server config, CI gates
+/.env.example                       @halal-brothers/senior-devs
+/.github/                           @halal-brothers/senior-devs
+/.semgrep/                          @halal-brothers/senior-devs
+/.gitleaks.toml                     @halal-brothers/senior-devs
+/phpstan.neon                       @halal-brothers/senior-devs
+/tests/Arch/                        @halal-brothers/senior-devs
+/deploy/                            @halal-brothers/senior-devs
+/composer.json                      @halal-brothers/senior-devs
+/composer.lock                      @halal-brothers/senior-devs

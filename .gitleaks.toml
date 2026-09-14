@@ -1,0 +1,24 @@
+# gitleaks: fail CI when a secret lands in a commit.
+title = "Halal Brothers store"
+
+[extend]
+useDefault = true   # Stripe, Twilio, AWS, GitHub, private keys, generic high-entropy tokens…
+
+[[rules]]
+id = "laravel-app-key"
+description = "Laravel APP_KEY"
+regex = '''APP_KEY=base64:[A-Za-z0-9+/=]{40,}'''
+keywords = ["app_key"]
+
+[[rules]]
+id = "forge-deploy-webhook"
+description = "Laravel Forge deploy trigger URL"
+regex = '''https://forge\.laravel\.com/servers/\d+/sites/\d+/deploy/http\?token=[A-Za-z0-9]+'''
+keywords = ["forge.laravel.com"]
+
+[allowlist]
+description = "Example env files and test fixtures contain placeholders only"
+paths = [
+  '''\.env\.example$''',
+  '''tests/fixtures/''',
+]
