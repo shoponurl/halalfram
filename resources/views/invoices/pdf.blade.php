@@ -44,7 +44,12 @@
         <tbody>
             @foreach ($order->items as $item)
                 <tr>
-                    <td>{{ $item->product_name }}</td>
+                    <td>
+                        {{ $item->product_name }}
+                        @if ($item->cut_option_name || $item->offal_option_name || $item->packing_option_name)
+                            <br><span class="muted">{{ collect([$item->cut_option_name, $item->offal_option_name, $item->packing_option_name])->filter()->implode(' · ') }}</span>
+                        @endif
+                    </td>
                     <td class="r">{{ $item->quantity }}</td>
                     <td class="r">{{ $c::format($item->price_per_lb_cents) }}</td>
                     <td class="r">{{ $lb($item->estimated_weight_lb->toDecimal()) }}</td>

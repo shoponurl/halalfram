@@ -19,6 +19,7 @@ class ProductsTable
         return $table
             ->columns([
                 TextColumn::make('name')->searchable()->weight('bold')->description(fn (Product $record) => '/products/'.$record->slug),
+                TextColumn::make('category.name')->label('Category')->placeholder('—')->sortable(),
                 TextColumn::make('price_per_lb_cents')->label('Price / lb')->formatStateUsing(fn (int $state) => Cents::format($state)),
                 TextColumn::make('estimated_weight_lb')->label('Est. weight')->formatStateUsing(fn (Weight $state) => rtrim(rtrim($state->toDecimal(), '0'), '.').' lb'),
                 TextColumn::make('estimate')->label('Est. price / piece')->state(fn (Product $record) => Cents::format($record->estimatedPieceCents())),

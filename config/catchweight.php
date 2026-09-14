@@ -26,5 +26,10 @@ return [
     // checked 2026-09-14). The real deadline comes from the charge's `capture_before`; this is the fallback.
     'authorization_fallback_days' => 7,
 
+    // Owner decision (guideline ch. 7, S02, recorded 2026-09-14): cut/packing options that add butcher
+    // processing time are capped so a real order can never need longer than the hold stays valid.
+    // Kept below authorization_fallback_days to leave a buffer for weighing, QC and capture.
+    'max_lead_time_days' => 4,
+
     'currency' => 'usd',
 ];

@@ -28,6 +28,7 @@ use Illuminate\Support\Carbon;
  * @property string $customer_phone
  * @property string $fulfilment
  * @property string|null $notes
+ * @property int $lead_time_days
  * @property int $estimated_cents
  * @property int $hold_cents
  * @property int|null $final_cents
@@ -76,6 +77,7 @@ class Order extends Model
     {
         return [
             'status' => OrderStatus::class,
+            'lead_time_days' => 'integer',
             'estimated_cents' => 'integer',
             'hold_cents' => 'integer',
             'final_cents' => 'integer',

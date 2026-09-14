@@ -62,4 +62,10 @@ class OrderPolicy
     {
         return $user->can(Permission::ApproveAdjustments->value) && $order->status === OrderStatus::NeedsReview;
     }
+
+    /** The butcher's cutting sheet is only useful once the hold is placed and weighing can start. */
+    public function printCuttingSheet(User $user, Order $order): bool
+    {
+        return $user->can(Permission::RecordWeights->value) && $order->status !== OrderStatus::PendingPayment;
+    }
 }

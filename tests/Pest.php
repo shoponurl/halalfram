@@ -2,7 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Enums\CutStyle;
 use App\Enums\Role;
+use App\Enums\Species;
+use App\Models\Category;
+use App\Models\CutOption;
+use App\Models\OffalOption;
+use App\Models\PackingOption;
 use App\Models\Product;
 use App\Models\User;
 use App\Payments\FakePaymentGateway;
@@ -45,11 +51,12 @@ function fakePayments(): FakePaymentGateway
 }
 
 /** A minimal active catch-weight product, e.g. product(priceCents: 349, estLb: '3.5'). */
-function product(string $name = 'Whole Chicken', int $priceCents = 349, string $estLb = '3.500', ?string $tolerancePct = null): Product
+function product(string $name = 'Whole Chicken', int $priceCents = 349, string $estLb = '3.500', ?string $tolerancePct = null, ?Category $category = null): Product
 {
     $product = new Product;
     $product->slug = Str::slug($name).'-'.Str::random(6);
     $product->name = $name;
+    $product->category_id = $category?->id;
     $product->price_per_lb_cents = $priceCents;
     $product->estimated_weight_lb = Weight::pounds($estLb);
     $product->tolerance_pct = $tolerancePct;
@@ -57,4 +64,55 @@ function product(string $name = 'Whole Chicken', int $priceCents = 349, string $
     $product->save();
 
     return $product;
+}
+
+/** A category that offers cut/offal options unless $supportsCustomCuts is false. */
+function category(string $name = 'Goat', bool $supportsCustomCuts = true): Category
+{
+    $category = new Category;
+    $category->slug = Str::slug($name).'-'.Str::random(6);
+    $category->name = $name;
+    $category->species = Species::Goat;
+    $category->supports_custom_cuts = $supportsCustomCuts;
+    $category->save();
+
+    return $category;
+}
+
+function cutOption(Category $category, string $name = 'Boneless', int $extraPriceCents = 0, int $extraLeadTimeDays = 0): CutOption
+{
+    $option = new CutOption;
+    $option->category_id = $category->id;
+    $option->name = $name;
+    $option->cut_style = CutStyle::Boneless;
+    $option->extra_price_cents = $extraPriceCents;
+    $option->extra_lead_time_days = $extraLeadTimeDays;
+    $option->is_active = true;
+    $option->save();
+
+    return $option;
+}
+
+function offalOption(Category $category, string $name = 'Separate pack', int $extraPriceCents = 0): OffalOption
+{
+    $option = new OffalOption;
+    $option->category_id = $category->id;
+    $option->name = $name;
+    $option->extra_price_cents = $extraPriceCents;
+    $option->is_active = true;
+    $option->save();
+
+    return $option;
+}
+
+function packingOption(string $name = 'Vacuum pack', int $surchargeCents = 0, int $extraLeadTimeDays = 0): PackingOption
+{
+    $option = new PackingOption;
+    $option->name = $name.' '.Str::random(4);
+    $option->surcharge_cents = $surchargeCents;
+    $option->extra_lead_time_days = $extraLeadTimeDays;
+    $option->is_active = true;
+    $option->save();
+
+    return $option;
 }

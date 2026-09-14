@@ -30,7 +30,7 @@ final class PlaceOrder extends Action
     ) {}
 
     /**
-     * @param  array<int, int>  $lines  product id => quantity (pieces), straight from the session cart
+     * @param  array<int|string, int|array<string, int|null>>  $lines  raw cart lines, straight from the session
      * @param  array{customer_name: string, customer_email: string, customer_phone: string, notes?: string|null}  $customer
      * @param  int  $expectedHoldCents  the hold the customer saw; any difference means prices changed or were tampered with
      * @return array{order: Order, token: string}
@@ -64,6 +64,7 @@ final class PlaceOrder extends Action
             $order->user_id = $user?->id;
             $order->status = OrderStatus::PendingPayment;
             $order->fulfilment = 'pickup';
+            $order->lead_time_days = $quote['lead_time_days'];
             $order->estimated_cents = $quote['estimated_cents'];
             $order->hold_cents = $quote['hold_cents'];
             $order->currency = (string) config('catchweight.currency');
@@ -83,6 +84,16 @@ final class PlaceOrder extends Action
                 $item->price_per_lb_cents = $line['product']->price_per_lb_cents;
                 $item->estimated_weight_lb = $line['weight'];
                 $item->estimated_cents = $line['estimated_cents'];
+                $item->cut_option_id = $line['cut_option']?->id;
+                $item->cut_option_name = $line['cut_option']?->name;
+                $item->cut_option_price_cents = $line['cut_option']->extra_price_cents ?? 0;
+                $item->offal_option_id = $line['offal_option']?->id;
+                $item->offal_option_name = $line['offal_option']?->name;
+                $item->offal_option_price_cents = $line['offal_option']->extra_price_cents ?? 0;
+                $item->packing_option_id = $line['packing_option']?->id;
+                $item->packing_option_name = $line['packing_option']?->name;
+                $item->packing_option_price_cents = $line['packing_option']->surcharge_cents ?? 0;
+                $item->lead_time_days = $line['lead_time_days'];
                 $order->items()->save($item);
             }
 

@@ -30,4 +30,5 @@ Create real staff in production with `php artisan staff:create`.
 
 - [x] **Sprint 00: foundation and guardrails.** See [docs/sprint-00.md](docs/sprint-00.md) for the Definition of Done evidence.
 - [x] **Sprint 01: vertical slice**, catch-weight order → hold → weight → capture → invoice. See [docs/sprint-01.md](docs/sprint-01.md) — the real $1 Stripe test-mode run is still open, pending your test keys.
-- [ ] Sprint 02: catalog & cut options
+- [x] **Sprint 02: catalog & cut options.** See [docs/sprint-02.md](docs/sprint-02.md) — real photos and your full catalog still need adding via `/admin/products` in staging.
+- [ ] Sprint 03: inventory, lot & cold storage

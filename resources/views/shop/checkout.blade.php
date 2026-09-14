@@ -40,11 +40,20 @@
             <ul class="mt-4 space-y-3 text-sm">
                 @foreach ($quote['lines'] as $line)
                     <li class="flex justify-between gap-3">
-                        <span>{{ $line['quantity'] }} × {{ $line['product']->name }}<br><span class="text-ink-500">~{{ rtrim(rtrim($line['weight']->toDecimal(), '0'), '.') }} lb</span></span>
+                        <span>
+                            {{ $line['quantity'] }} × {{ $line['product']->name }}<br>
+                            <span class="text-ink-500">~{{ rtrim(rtrim($line['weight']->toDecimal(), '0'), '.') }} lb</span>
+                            @if ($line['cut_option'] || $line['offal_option'] || $line['packing_option'])
+                                <br><span class="text-ink-500">{{ collect([$line['cut_option']?->name, $line['offal_option']?->name, $line['packing_option']?->name])->filter()->implode(' · ') }}</span>
+                            @endif
+                        </span>
                         <span class="font-bold tabular-nums">{{ $c::format($line['estimated_cents']) }}</span>
                     </li>
                 @endforeach
             </ul>
+            @if ($quote['lead_time_days'] > 0)
+                <p class="mt-3 text-xs font-semibold text-halal-600">Your options need about {{ $quote['lead_time_days'] }} extra day{{ $quote['lead_time_days'] === 1 ? '' : 's' }} to prepare before pickup.</p>
+            @endif
             <dl class="mt-4 space-y-1.5 border-t border-bone-200 pt-4 text-sm">
                 <div class="flex justify-between"><dt class="text-ink-600">Estimated total</dt><dd class="font-bold tabular-nums">{{ $c::format($quote['estimated_cents']) }}</dd></div>
                 <div class="flex justify-between"><dt class="text-ink-600">Card hold (estimate + {{ $policy['hold_tolerance_pct'] }}%)</dt><dd class="tabular-nums">{{ $c::format($quote['hold_cents']) }}</dd></div>

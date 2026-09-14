@@ -17,7 +17,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use UnitEnum;
 
-/** Minimal catch-weight catalog for Sprint 01. Categories, variants and cut options arrive in Sprint 02. */
+/** Catch-weight catalog. Cut/offal/packing options live on their own resources, scoped by category. */
 class ProductResource extends Resource
 {
     protected static ?string $model = Product::class;

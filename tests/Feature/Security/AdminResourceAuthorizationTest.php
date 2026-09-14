@@ -30,6 +30,16 @@ $productRoutes = [
     'create' => fn () => '/admin/products/create',
     'edit' => fn (object $ctx) => "/admin/products/{$ctx->product->slug}/edit",
 ];
+$catalogOptionRoutes = [
+    'categories.list' => fn () => '/admin/categories',
+    'categories.create' => fn () => '/admin/categories/create',
+    'cut-options.list' => fn () => '/admin/cut-options',
+    'cut-options.create' => fn () => '/admin/cut-options/create',
+    'offal-options.list' => fn () => '/admin/offal-options',
+    'offal-options.create' => fn () => '/admin/offal-options/create',
+    'packing-options.list' => fn () => '/admin/packing-options',
+    'packing-options.create' => fn () => '/admin/packing-options/create',
+];
 
 // Only Owner, Manager, Front desk, Butcher and Accountant have orders.view (App\Enums\Role::permissions())
 $canViewOrders = [Role::Owner, Role::Manager, Role::FrontDesk, Role::Butcher, Role::Accountant];
@@ -51,7 +61,26 @@ foreach (Role::cases() as $role) {
             $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
         });
     }
+    foreach ($catalogOptionRoutes as $name => $url) {
+        it("returns {$expected} for {$role->label()} on catalog {$name}", function () use ($role, $url, $expected) {
+            $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
+        });
+    }
 }
+
+it('lets a butcher print the cutting sheet once the order is authorized, but not before or for other staff', function () {
+    $butcher = staff(Role::Butcher);
+    $accountant = staff(Role::Accountant);
+
+    expect($butcher->can('printCuttingSheet', $this->order))->toBeFalse()   // still pending payment
+        ->and($accountant->can('printCuttingSheet', $this->order))->toBeFalse();
+
+    $this->order->status = OrderStatus::Authorized;
+    $this->order->save();
+
+    expect($butcher->can('printCuttingSheet', $this->order))->toBeTrue()
+        ->and($accountant->can('printCuttingSheet', $this->order))->toBeFalse();
+});
 
 it('lets a butcher record a weight but not finalize the order', function () {
     $butcher = staff(Role::Butcher);

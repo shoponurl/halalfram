@@ -7,39 +7,56 @@ namespace App\Support;
 use App\Actions\Orders\QuoteCart;
 use Illuminate\Contracts\Session\Session;
 
-/** Session cart: product id => quantity. Holds no prices — those are always re-quoted on the server. */
+/**
+ * Session cart. Holds no prices — those are always re-quoted on the server. A line is a product plus
+ * an optional cut/offal/packing choice; two adds of the same product+options merge into one line.
+ */
 final class Cart
 {
     private const KEY = 'cart.lines';
 
     public function __construct(private readonly Session $session) {}
 
-    /** @return array<int, int> */
+    /** @return array<int|string, int|array<string, int|null>> raw shape, straight from the session */
     public function lines(): array
     {
         $lines = $this->session->get(self::KEY, []);
 
-        return is_array($lines) ? array_map(intval(...), $lines) : [];
+        return is_array($lines) ? $lines : [];
     }
 
-    public function add(int $productId, int $quantity): void
+    public function add(int $productId, int $quantity, ?int $cutOptionId = null, ?int $offalOptionId = null, ?int $packingOptionId = null): void
     {
+        $line = new CartLine($productId, $quantity, $cutOptionId, $offalOptionId, $packingOptionId);
         $lines = $this->lines();
-        $lines[$productId] = min(QuoteCart::MAX_QUANTITY, ($lines[$productId] ?? 0) + $quantity);
+        $key = $line->key();
+
+        $existingQuantity = is_int($lines[$key] ?? null) ? $lines[$key] : ($lines[$key]['quantity'] ?? 0);
+        $newQuantity = min(QuoteCart::MAX_QUANTITY, ((int) $existingQuantity) + $quantity);
+
+        $lines[$key] = $line->cutOptionId === null && $line->offalOptionId === null && $line->packingOptionId === null
+            ? $newQuantity
+            : (new CartLine($productId, $newQuantity, $cutOptionId, $offalOptionId, $packingOptionId))->toArray();
+
         $this->session->put(self::KEY, $lines);
     }
 
-    public function set(int $productId, int $quantity): void
+    public function updateQuantity(string $lineKey, int $quantity): void
     {
         $lines = $this->lines();
-        $lines[$productId] = min(QuoteCart::MAX_QUANTITY, max(1, $quantity));
+        if (! array_key_exists($lineKey, $lines)) {
+            return;
+        }
+
+        $quantity = min(QuoteCart::MAX_QUANTITY, max(1, $quantity));
+        $lines[$lineKey] = is_int($lines[$lineKey]) ? $quantity : [...$lines[$lineKey], 'quantity' => $quantity];
         $this->session->put(self::KEY, $lines);
     }
 
-    public function remove(int $productId): void
+    public function remove(string $lineKey): void
     {
         $lines = $this->lines();
-        unset($lines[$productId]);
+        unset($lines[$lineKey]);
         $this->session->put(self::KEY, $lines);
     }
 
@@ -50,6 +67,11 @@ final class Cart
 
     public function count(): int
     {
-        return array_sum($this->lines());
+        $total = 0;
+        foreach ($this->lines() as $key => $value) {
+            $total += CartLine::fromRaw($key, $value)->quantity;
+        }
+
+        return $total;
     }
 }

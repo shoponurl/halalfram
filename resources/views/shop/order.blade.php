@@ -36,7 +36,12 @@
             <tbody class="divide-y divide-bone-200">
                 @foreach ($order->items as $item)
                     <tr>
-                        <td class="px-5 py-3 font-semibold">{{ $item->quantity }} × {{ $item->product_name }}</td>
+                        <td class="px-5 py-3 font-semibold">
+                            {{ $item->quantity }} × {{ $item->product_name }}
+                            @if ($item->cut_option_name || $item->offal_option_name || $item->packing_option_name)
+                                <br><span class="text-xs font-normal text-ink-500">{{ collect([$item->cut_option_name, $item->offal_option_name, $item->packing_option_name])->filter()->implode(' · ') }}</span>
+                            @endif
+                        </td>
                         <td>{{ rtrim(rtrim($item->estimated_weight_lb->toDecimal(), '0'), '.') }} lb · {{ $c::format($item->estimated_cents) }}</td>
                         <td>{{ $item->actual_weight_lb ? rtrim(rtrim($item->actual_weight_lb->toDecimal(), '0'), '.').' lb' : 'Not weighed yet' }}</td>
                         <td class="px-5 text-right font-bold tabular-nums">{{ $c::format($item->final_cents ?? $item->estimated_cents) }}</td>

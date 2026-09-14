@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Shop\CartController;
+use App\Http\Controllers\Shop\CategoryController;
 use App\Http\Controllers\Shop\CheckoutController;
 use App\Http\Controllers\Shop\InvoiceController;
 use App\Http\Controllers\Shop\OrderController;
@@ -10,16 +11,17 @@ use App\Http\Controllers\Shop\ProductController;
 use App\Http\Controllers\StripeWebhookController;
 use Illuminate\Support\Facades\Route;
 
-// Storefront home. The rest of the catalog moves from hash routes to real pages in Sprint 02.
+// Storefront home (the pixel-ported marketing design). Category and product browsing are real pages.
 Route::view('/', 'home')->name('home');
 
-// Sprint 01 vertical slice: one catch-weight product through order → hold → weight → capture → invoice
+Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
+Route::get('/categories/{category}', [CategoryController::class, 'show'])->name('categories.show');
 Route::get('/products/{product}', [ProductController::class, 'show'])->name('products.show');
 
 Route::get('/cart', [CartController::class, 'show'])->name('cart.show');
 Route::post('/cart', [CartController::class, 'add'])->middleware('throttle:30,1')->name('cart.add');
-Route::patch('/cart/{product}', [CartController::class, 'update'])->middleware('throttle:30,1')->name('cart.update');
-Route::delete('/cart/{product}', [CartController::class, 'remove'])->name('cart.remove');
+Route::patch('/cart/{line}', [CartController::class, 'update'])->middleware('throttle:30,1')->name('cart.update');
+Route::delete('/cart/{line}', [CartController::class, 'remove'])->name('cart.remove');
 
 Route::get('/checkout', [CheckoutController::class, 'create'])->name('checkout.create');
 Route::post('/checkout', [CheckoutController::class, 'store'])->middleware('throttle:checkout')->name('checkout.store');

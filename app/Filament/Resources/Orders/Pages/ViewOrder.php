@@ -11,6 +11,7 @@ use App\Filament\Resources\Orders\OrderResource;
 use App\Models\Order;
 use App\Models\User;
 use App\Support\Cents;
+use App\Support\CuttingSheetPdf;
 use App\Support\SettlementPlan;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -63,6 +64,18 @@ class ViewOrder extends ViewRecord
                 ->color('gray')
                 ->visible(fn (Order $record) => in_array($record->status, [OrderStatus::Completed, OrderStatus::AwaitingBalance], true))
                 ->url(fn (Order $record) => route('orders.invoice', $record)),
+
+            Action::make('cuttingSheet')
+                ->label('Cutting sheet')
+                ->icon('heroicon-o-scissors')
+                ->color('gray')
+                ->authorize(fn (Order $record) => auth()->user()?->can('printCuttingSheet', $record) ?? false)
+                ->action(fn (Order $record) => response()->streamDownload(
+                    function () use ($record) {
+                        echo app(CuttingSheetPdf::class)->render($record)->output();
+                    },
+                    "cutting-sheet-{$record->number}.pdf",
+                )),
         ];
     }
 

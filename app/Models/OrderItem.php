@@ -22,16 +22,36 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $estimated_cents
  * @property Weight|null $actual_weight_lb
  * @property int|null $final_cents
+ * @property int|null $cut_option_id
+ * @property string|null $cut_option_name
+ * @property int $cut_option_price_cents
+ * @property int|null $offal_option_id
+ * @property string|null $offal_option_name
+ * @property int $offal_option_price_cents
+ * @property int|null $packing_option_id
+ * @property string|null $packing_option_name
+ * @property int $packing_option_price_cents
+ * @property int $lead_time_days
  * @property-read Order $order
  * @property-read Product $product
  * @property-read Collection<int, WeightEvent> $weightEvents
  */
 class OrderItem extends Model
 {
-    /** Line data is built by PlaceOrder from the product; nothing here comes from the client. @var list<string> */
+    /** Line data is built by PlaceOrder from the product/options; nothing here comes from the client. @var list<string> */
     protected $fillable = [
         'product_id',
         'quantity',
+        'cut_option_id',
+        'cut_option_name',
+        'cut_option_price_cents',
+        'offal_option_id',
+        'offal_option_name',
+        'offal_option_price_cents',
+        'packing_option_id',
+        'packing_option_name',
+        'packing_option_price_cents',
+        'lead_time_days',
     ];
 
     /** @return array<string, string> */
@@ -44,6 +64,10 @@ class OrderItem extends Model
             'estimated_cents' => 'integer',
             'actual_weight_lb' => WeightCast::class,
             'final_cents' => 'integer',
+            'cut_option_price_cents' => 'integer',
+            'offal_option_price_cents' => 'integer',
+            'packing_option_price_cents' => 'integer',
+            'lead_time_days' => 'integer',
         ];
     }
 
@@ -57,6 +81,12 @@ class OrderItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /** The combined cut/offal/packing surcharge already folded into estimated_cents/final_cents. */
+    public function optionSurchargeCents(): int
+    {
+        return $this->cut_option_price_cents + $this->offal_option_price_cents + $this->packing_option_price_cents;
     }
 
     /** @return HasMany<WeightEvent, $this> */
