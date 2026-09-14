@@ -46,6 +46,8 @@ class ItemsRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('product_name')->label('Product')->weight('bold')
                     ->description(fn (OrderItem $record) => Cents::format($record->price_per_lb_cents).' / lb'),
+                TextColumn::make('lot.lot_number')->label('Lot')->placeholder('Not tracked')
+                    ->description(fn (OrderItem $record) => $record->lot?->animal?->tag_id ? "Animal {$record->lot->animal->tag_id}" : null),
                 TextColumn::make('quantity')->label('Pieces')->alignCenter(),
                 TextColumn::make('estimated_weight_lb')->label('Est. weight')->formatStateUsing($lb),
                 TextColumn::make('estimated_cents')->label('Estimate')->formatStateUsing(fn (int $state) => Cents::format($state)),

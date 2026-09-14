@@ -19,6 +19,7 @@ beforeEach(function () {
         ['customer_name' => 'A', 'customer_email' => 'a@example.com', 'customer_phone' => '2675550123'],
         (int) round($this->product->estimatedPieceCents() * 1.10),
     );
+    $this->lot = lot($this->product);
 });
 
 $orderRoutes = [
@@ -39,6 +40,14 @@ $catalogOptionRoutes = [
     'offal-options.create' => fn () => '/admin/offal-options/create',
     'packing-options.list' => fn () => '/admin/packing-options',
     'packing-options.create' => fn () => '/admin/packing-options/create',
+];
+$inventoryRoutes = [
+    'animals.list' => fn () => '/admin/animals',
+    'animals.create' => fn () => '/admin/animals/create',
+    'lots.list' => fn () => '/admin/lots',
+    'lots.create' => fn () => '/admin/lots/create',
+    'lots.edit' => fn (object $ctx) => "/admin/lots/{$ctx->lot->lot_number}/edit",
+    'recall-report' => fn () => '/admin/recall-report',
 ];
 
 // Only Owner, Manager, Front desk, Butcher and Accountant have orders.view (App\Enums\Role::permissions())
@@ -63,6 +72,17 @@ foreach (Role::cases() as $role) {
     }
     foreach ($catalogOptionRoutes as $name => $url) {
         it("returns {$expected} for {$role->label()} on catalog {$name}", function () use ($role, $url, $expected) {
+            $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
+        });
+    }
+}
+
+// Owner, Manager and Butcher have inventory.manage (App\Enums\Role::permissions())
+$canManageInventory = [Role::Owner, Role::Manager, Role::Butcher];
+foreach (Role::cases() as $role) {
+    $expected = in_array($role, $canManageInventory, true) ? 200 : 403;
+    foreach ($inventoryRoutes as $name => $url) {
+        it("returns {$expected} for {$role->label()} on inventory {$name}", function () use ($role, $url, $expected) {
             $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
         });
     }

@@ -38,12 +38,12 @@ enum Role: string
         return match ($this) {
             self::Owner => Permission::cases(),
             self::Manager => [
-                Permission::AccessAdmin, Permission::ManageCatalog, Permission::ViewOrders, Permission::ManageOrders,
+                Permission::AccessAdmin, Permission::ManageCatalog, Permission::ManageInventory, Permission::ViewOrders, Permission::ManageOrders,
                 Permission::RecordWeights, Permission::ApproveAdjustments, Permission::ManageDeliveries,
                 Permission::ViewReports, Permission::ViewAuditLog,
             ],
             self::FrontDesk => [Permission::AccessAdmin, Permission::ViewOrders, Permission::ManageOrders],
-            self::Butcher => [Permission::AccessAdmin, Permission::ViewOrders, Permission::RecordWeights],
+            self::Butcher => [Permission::AccessAdmin, Permission::ViewOrders, Permission::RecordWeights, Permission::ManageInventory],
             self::Driver => [Permission::AccessAdmin, Permission::ManageDeliveries],
             self::Accountant => [Permission::AccessAdmin, Permission::ViewOrders, Permission::ViewReports, Permission::ViewAuditLog],
         };

@@ -31,6 +31,8 @@ final class FakePaymentGateway implements PaymentGateway
 
     public bool $declineOffSession = false;
 
+    public bool $declineHold = false;
+
     private int $sequence = 0;
 
     public function isConfigured(): bool
@@ -51,6 +53,9 @@ final class FakePaymentGateway implements PaymentGateway
     public function createHold(int $amountCents, string $customerId, string $description, array $metadata, string $idempotencyKey): IntentState
     {
         return $this->once($idempotencyKey, function () use ($amountCents, $metadata, $idempotencyKey) {
+            if ($this->declineHold) {
+                throw new RuntimeException('The card was declined.');
+            }
             $this->calls[] = ['operation' => 'hold', 'key' => $idempotencyKey, 'amount' => $amountCents];
             $id = 'pi_fake_'.(++$this->sequence);
 

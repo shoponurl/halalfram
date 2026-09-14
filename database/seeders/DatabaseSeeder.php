@@ -14,7 +14,8 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([RolesAndPermissionsSeeder::class, CategorySeeder::class, CatalogSeeder::class]);
 
-        // One demo account per role — local and staging only. Production owners are created with `php artisan staff:create`.
+        // Demo accounts and demo stock — local and staging only. Production owners are created with
+        // `php artisan staff:create`, and real inventory comes in via /admin/lots.
         if (! app()->environment(['local', 'staging', 'testing'])) {
             return;
         }
@@ -25,5 +26,7 @@ class DatabaseSeeder extends Seeder
                 ['name' => "Demo {$role->label()}", 'password' => 'Staging-Only-2026!'],
             )->syncRoles([$role->value]);
         }
+
+        $this->call(InventorySeeder::class);
     }
 }

@@ -62,6 +62,16 @@ final class Weight implements JsonSerializable, Stringable
         return new self(bcsub($this->pounds, $other->pounds, self::SCALE));
     }
 
+    /** This weight as the finished result of a yield %, e.g. dividedByPercent("70") for a 70%-yield cut. */
+    public function dividedByPercent(string $percent): self
+    {
+        if (! is_numeric($percent) || bccomp($percent, '0', 4) !== 1) {
+            throw new InvalidArgumentException("Invalid yield percentage [{$percent}].");
+        }
+
+        return new self(self::round(bcdiv($this->pounds, bcdiv($percent, '100', 10), 10)));
+    }
+
     /** Percentage difference from an estimate, e.g. "10.000" for +10 %. */
     public function variancePercentFrom(self $estimate): string
     {

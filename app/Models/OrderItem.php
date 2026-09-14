@@ -32,8 +32,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $packing_option_name
  * @property int $packing_option_price_cents
  * @property int $lead_time_days
+ * @property int|null $lot_id
+ * @property Weight|null $reserved_raw_weight_lb
+ * @property Weight|null $consumed_raw_weight_lb
  * @property-read Order $order
  * @property-read Product $product
+ * @property-read Lot|null $lot
  * @property-read Collection<int, WeightEvent> $weightEvents
  */
 class OrderItem extends Model
@@ -52,6 +56,9 @@ class OrderItem extends Model
         'packing_option_name',
         'packing_option_price_cents',
         'lead_time_days',
+        'lot_id',
+        'reserved_raw_weight_lb',
+        'consumed_raw_weight_lb',
     ];
 
     /** @return array<string, string> */
@@ -68,6 +75,8 @@ class OrderItem extends Model
             'offal_option_price_cents' => 'integer',
             'packing_option_price_cents' => 'integer',
             'lead_time_days' => 'integer',
+            'reserved_raw_weight_lb' => WeightCast::class,
+            'consumed_raw_weight_lb' => WeightCast::class,
         ];
     }
 
@@ -81,6 +90,12 @@ class OrderItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /** @return BelongsTo<Lot, $this> */
+    public function lot(): BelongsTo
+    {
+        return $this->belongsTo(Lot::class);
     }
 
     /** The combined cut/offal/packing surcharge already folded into estimated_cents/final_cents. */

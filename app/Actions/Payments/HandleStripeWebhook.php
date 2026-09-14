@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Payments;
 
 use App\Actions\Action;
+use App\Actions\Inventory\ReleaseStock;
 use App\Actions\Orders\MarkBalancePaid;
 use App\Actions\Orders\MarkOrderAuthorized;
 use App\Enums\OrderStatus;
@@ -25,6 +26,7 @@ final class HandleStripeWebhook extends Action
         private readonly PaymentGateway $payments,
         private readonly MarkOrderAuthorized $markAuthorized,
         private readonly MarkBalancePaid $markBalancePaid,
+        private readonly ReleaseStock $releaseStock,
     ) {}
 
     public function handle(WebhookEvent $event): string
@@ -76,6 +78,7 @@ final class HandleStripeWebhook extends Action
         if (in_array($order->status, [OrderStatus::Authorized, OrderStatus::NeedsReview], true)) {
             $order->status = OrderStatus::AuthorizationExpired;
             $order->save();
+            $this->releaseStock->handle($order);
 
             return 'authorization_expired';
         }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Orders;
 
 use App\Actions\Action;
+use App\Actions\Inventory\ConsumeStock;
 use App\Enums\OrderStatus;
 use App\Jobs\SettleOrderPayment;
 use App\Models\Order;
@@ -17,6 +18,8 @@ use Illuminate\Validation\ValidationException;
  */
 final class FinalizeOrder extends Action
 {
+    public function __construct(private readonly ConsumeStock $consumeStock) {}
+
     public function handle(Order $order, User $by): SettlementPlan
     {
         // DB::transaction() only returns once the commit has actually happened (or rolls back and rethrows),
@@ -64,6 +67,12 @@ final class FinalizeOrder extends Action
             $locked->finalized_by = $by->id;
             $locked->save();
             $order->setRawAttributes($locked->getAttributes(), true);
+
+            // Weights are locked now — convert each item's reservation into an actual consumption
+            // (guideline ch. 6, Sprint 03). A no-op for items not under inventory tracking.
+            foreach ($locked->items as $item) {
+                $this->consumeStock->handle($item);
+            }
 
             return [$plan, true];
         });

@@ -11,6 +11,7 @@ use App\Support\Weight;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -65,6 +66,12 @@ class Product extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    /** @return HasMany<Lot, $this> */
+    public function lots(): HasMany
+    {
+        return $this->hasMany(Lot::class);
     }
 
     /** Custom cut/offal/packing options only apply to products in a category that offers them. */

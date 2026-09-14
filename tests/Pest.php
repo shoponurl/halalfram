@@ -3,10 +3,14 @@
 declare(strict_types=1);
 
 use App\Enums\CutStyle;
+use App\Enums\LotStatus;
 use App\Enums\Role;
 use App\Enums\Species;
+use App\Enums\StorageLocation;
+use App\Models\Animal;
 use App\Models\Category;
 use App\Models\CutOption;
+use App\Models\Lot;
 use App\Models\OffalOption;
 use App\Models\PackingOption;
 use App\Models\Product;
@@ -79,7 +83,7 @@ function category(string $name = 'Goat', bool $supportsCustomCuts = true): Categ
     return $category;
 }
 
-function cutOption(Category $category, string $name = 'Boneless', int $extraPriceCents = 0, int $extraLeadTimeDays = 0): CutOption
+function cutOption(Category $category, string $name = 'Boneless', int $extraPriceCents = 0, int $extraLeadTimeDays = 0, ?string $rawYieldPct = null): CutOption
 {
     $option = new CutOption;
     $option->category_id = $category->id;
@@ -87,6 +91,7 @@ function cutOption(Category $category, string $name = 'Boneless', int $extraPric
     $option->cut_style = CutStyle::Boneless;
     $option->extra_price_cents = $extraPriceCents;
     $option->extra_lead_time_days = $extraLeadTimeDays;
+    $option->raw_yield_pct = $rawYieldPct;
     $option->is_active = true;
     $option->save();
 
@@ -115,4 +120,38 @@ function packingOption(string $name = 'Vacuum pack', int $surchargeCents = 0, in
     $option->save();
 
     return $option;
+}
+
+function animal(string $tagId = 'F145', ?string $liveLb = '150.000', ?string $dressedLb = '90.000'): Animal
+{
+    $animal = new Animal;
+    $animal->tag_id = $tagId.'-'.Str::random(4);
+    $animal->species = Species::Goat;
+    $animal->slaughter_date = now()->subDay();
+    $animal->live_weight_lb = $liveLb === null ? null : Weight::pounds($liveLb);
+    $animal->dressed_weight_lb = $dressedLb === null ? null : Weight::pounds($dressedLb);
+    $animal->recorded_by = User::factory()->create()->id;
+    $animal->save();
+
+    return $animal;
+}
+
+/** An active lot for a product, e.g. lot($product, onHandLb: '20.000', useByDaysFromNow: 5). */
+function lot(Product $product, string $onHandLb = '20.000', int $useByDaysFromNow = 5, ?Animal $animal = null, StorageLocation $storageLocation = StorageLocation::Chiller): Lot
+{
+    $lotModel = new Lot;
+    $lotModel->product_id = $product->id;
+    $lotModel->animal_id = $animal?->id;
+    $lotModel->storage_location = $storageLocation;
+    $lotModel->pack_date = now();
+    $lotModel->use_by_date = now()->addDays($useByDaysFromNow);
+    $lotModel->status = LotStatus::Active;
+    $lotModel->on_hand_weight_lb = Weight::pounds($onHandLb);
+    $lotModel->reserved_weight_lb = Weight::zero();
+    $lotModel->received_by = User::factory()->create()->id;
+    $lotModel->save();
+    $lotModel->lot_number = 'LOT-'.str_pad((string) $lotModel->id, 6, '0', STR_PAD_LEFT);
+    $lotModel->save();
+
+    return $lotModel;
 }

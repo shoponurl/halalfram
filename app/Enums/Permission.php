@@ -10,6 +10,7 @@ enum Permission: string
     case ManageStaff = 'staff.manage';
     case ManageSettings = 'settings.manage';
     case ManageCatalog = 'catalog.manage';
+    case ManageInventory = 'inventory.manage';
     case ViewOrders = 'orders.view';
     case ManageOrders = 'orders.manage';
     case RecordWeights = 'weights.record';

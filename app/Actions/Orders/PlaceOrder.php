@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Actions\Orders;
 
 use App\Actions\Action;
+use App\Actions\Inventory\ReleaseStock;
+use App\Actions\Inventory\ReserveStock;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentTransactionType;
 use App\Models\Order;
@@ -27,6 +29,8 @@ final class PlaceOrder extends Action
     public function __construct(
         private readonly PaymentGateway $payments,
         private readonly QuoteCart $quote,
+        private readonly ReserveStock $reserveStock,
+        private readonly ReleaseStock $releaseStock,
     ) {}
 
     /**
@@ -95,6 +99,10 @@ final class PlaceOrder extends Action
                 $item->packing_option_price_cents = $line['packing_option']->surcharge_cents ?? 0;
                 $item->lead_time_days = $line['lead_time_days'];
                 $order->items()->save($item);
+
+                // Sprint 03 (guideline ch. 6): reserves raw stock FEFO; a no-op for products not yet
+                // under inventory tracking, so Sprint 01/02 checkout is unaffected either way.
+                $this->reserveStock->handle($item, $line['product'], $line['cut_option']);
             }
 
             return $order;
@@ -112,6 +120,7 @@ final class PlaceOrder extends Action
         } catch (Throwable $e) {
             $order->status = OrderStatus::PaymentFailed;
             $order->save();
+            $this->releaseStock->handle($order);
 
             throw $e;
         }
