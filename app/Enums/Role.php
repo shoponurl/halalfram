@@ -39,7 +39,8 @@ enum Role: string
             self::Owner => Permission::cases(),
             self::Manager => [
                 Permission::AccessAdmin, Permission::ManageCatalog, Permission::ViewOrders, Permission::ManageOrders,
-                Permission::RecordWeights, Permission::ManageDeliveries, Permission::ViewReports, Permission::ViewAuditLog,
+                Permission::RecordWeights, Permission::ApproveAdjustments, Permission::ManageDeliveries,
+                Permission::ViewReports, Permission::ViewAuditLog,
             ],
             self::FrontDesk => [Permission::AccessAdmin, Permission::ViewOrders, Permission::ManageOrders],
             self::Butcher => [Permission::AccessAdmin, Permission::ViewOrders, Permission::RecordWeights],

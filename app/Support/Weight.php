@@ -52,6 +52,11 @@ final class Weight implements JsonSerializable, Stringable
         return new self(bcadd($this->pounds, $other->pounds, self::SCALE));
     }
 
+    public function times(int $factor): self
+    {
+        return new self(bcmul($this->pounds, (string) $factor, self::SCALE));
+    }
+
     public function minus(self $other): self
     {
         return new self(bcsub($this->pounds, $other->pounds, self::SCALE));
@@ -77,7 +82,11 @@ final class Weight implements JsonSerializable, Stringable
         return bccomp($this->pounds, '0', self::SCALE) === 1;
     }
 
-    /** The decimal string for the DECIMAL(10,3) column. */
+    /**
+     * The decimal string for the DECIMAL(10,3) column.
+     *
+     * @return numeric-string
+     */
     public function toDecimal(): string
     {
         return $this->pounds;

@@ -30,6 +30,13 @@ return [
         'key' => env('RESEND_KEY'),
     ],
 
+    'stripe' => [
+        'key' => env('STRIPE_KEY'),                       // pk_test_… / pk_live_…
+        'secret' => env('STRIPE_SECRET'),                 // sk_test_… / sk_live_…
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'), // whsec_…
+        // API version: pinned by stripe/stripe-php 21.3 (2026-08-26.dahlia). Upgrade the SDK to move it.
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

@@ -12,7 +12,7 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->call(RolesAndPermissionsSeeder::class);
+        $this->call([RolesAndPermissionsSeeder::class, CatalogSeeder::class]);
 
         // One demo account per role — local and staging only. Production owners are created with `php artisan staff:create`.
         if (! app()->environment(['local', 'staging', 'testing'])) {

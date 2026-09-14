@@ -13,6 +13,7 @@ enum Permission: string
     case ViewOrders = 'orders.view';
     case ManageOrders = 'orders.manage';
     case RecordWeights = 'weights.record';
+    case ApproveAdjustments = 'payments.approve_adjustments';   // release large underweight captures
     case ManageDeliveries = 'deliveries.manage';
     case ViewReports = 'reports.view';
     case ViewAuditLog = 'audit.view';
