@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * Money columns are integer cents. Status, amounts and Stripe references are never mass assignable:
@@ -27,6 +28,14 @@ use Illuminate\Support\Carbon;
  * @property string $customer_name
  * @property string $customer_email
  * @property string $customer_phone
+ * @property bool $marketing_sms_opt_in
+ * @property bool $marketing_email_opt_in
+ * @property string $payment_method
+ * @property string|null $payment_reference
+ * @property int $tax_cents
+ * @property int|null $coupon_id
+ * @property int $discount_cents
+ * @property int $store_credit_applied_cents
  * @property string $fulfilment
  * @property FulfilmentStatus $fulfilment_status
  * @property int|null $delivery_zone_id
@@ -78,6 +87,7 @@ use Illuminate\Support\Carbon;
  * @property-read DeliverySlot|null $deliverySlot
  * @property-read User|null $driver
  * @property-read Invoice|null $invoice
+ * @property-read Coupon|null $coupon
  */
 class Order extends Model
 {
@@ -87,6 +97,8 @@ class Order extends Model
         'customer_email',
         'customer_phone',
         'notes',
+        'marketing_sms_opt_in',
+        'marketing_email_opt_in',
     ];
 
     /** @var list<string> */
@@ -100,6 +112,11 @@ class Order extends Model
         return [
             'status' => OrderStatus::class,
             'fulfilment_status' => FulfilmentStatus::class,
+            'marketing_sms_opt_in' => 'boolean',
+            'marketing_email_opt_in' => 'boolean',
+            'tax_cents' => 'integer',
+            'discount_cents' => 'integer',
+            'store_credit_applied_cents' => 'integer',
             'delivery_fee_cents' => 'integer',
             'delivery_attempts' => 'integer',
             'ready_notified_at' => 'datetime',
@@ -185,6 +202,12 @@ class Order extends Model
         return $this->hasOne(Invoice::class);
     }
 
+    /** @return BelongsTo<Coupon, $this> */
+    public function coupon(): BelongsTo
+    {
+        return $this->belongsTo(Coupon::class);
+    }
+
     /** @return BelongsTo<User, $this> */
     public function customer(): BelongsTo
     {
@@ -197,10 +220,35 @@ class Order extends Model
         return $token !== null && $token !== '' && hash_equals($this->public_token_hash, hash('sha256', $token));
     }
 
+    /**
+     * A notification sent after checkout (guideline ch. 6, Sprint 06) can't reuse the original token —
+     * only its hash was ever stored (rule: never store a bearer credential in plaintext). Instead each
+     * one mints and stores a fresh token, so the link in the most recent message always works; an
+     * older, already-delivered link stops working once superseded.
+     */
+    public function issueFreshAccessToken(): string
+    {
+        $token = Str::random(48);
+        $this->public_token_hash = hash('sha256', $token);
+        $this->save();
+
+        return $token;
+    }
+
     /** Idempotency key for a Stripe call about this order (rule 03). */
     public function idempotencyKey(string $operation): string
     {
         return "order:{$this->uuid}:{$operation}";
+    }
+
+    /**
+     * The id the order's payment gateway needs for its *next* call. Stable for Stripe; a rolling
+     * pointer for PayPal, which uses a different id for its order/authorization/capture stages
+     * (guideline ch. 6, Sprint 06) — see App\Payments\PayPalGateway's class docblock.
+     */
+    public function gatewayIntentId(): ?string
+    {
+        return $this->payment_method === 'paypal' ? $this->payment_reference : $this->stripe_payment_intent_id;
     }
 
     public function allItemsWeighed(): bool

@@ -1,6 +1,7 @@
 @php($c = \App\Support\Cents::class)
 @php($totalEstimatedCents = $quote['estimated_cents'] + $deliveryFeeCents)
 @php($totalHoldCents = $quote['hold_cents'] + $deliveryFeeCents)
+@php($creditToApplyCents = min($availableCreditCents, max(0, $totalHoldCents - $policy['minimum_charge_cents'])))
 <x-layouts.shop title="Checkout">
     <h1 class="font-display text-4xl font-semibold">Checkout</h1>
     <p class="mt-2 text-ink-600">Store pickup at 3 Kelly Street, Lansdowne, or local delivery. No account needed.</p>
@@ -23,17 +24,33 @@
             </label>
             <button class="h-10 rounded-full bg-brand-800 px-5 text-sm font-bold text-white hover:bg-brand-700">Check</button>
         @endif
+        <input type="hidden" name="credit_email" value="{{ $creditEmail }}" />
     </form>
     @if ($zipError)
         <p class="mt-3 rounded-xl bg-brand-50 p-3 text-sm font-semibold text-brand-700">{{ $zipError }}</p>
     @endif
 
+    {{-- Store credit lookup (guideline ch. 7, S06) — a small GET reload, same pattern as the zip check --}}
+    <form method="get" action="{{ route('checkout.create') }}" class="mt-3 flex flex-wrap items-end gap-3 rounded-3xl bg-white p-5 ring-1 ring-bone-200">
+        <input type="hidden" name="fulfilment" value="{{ $fulfilmentMethod }}" />
+        <input type="hidden" name="zip" value="{{ $zip }}" />
+        <label class="text-sm font-semibold">
+            Have store credit? Enter your email to check
+            <input name="credit_email" type="email" value="{{ $creditEmail }}" placeholder="you@example.com"
+                   class="mt-1.5 block h-10 w-56 rounded-xl border border-bone-300 px-3 text-base focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-100" />
+        </label>
+        <button class="h-10 rounded-full bg-bone-200 px-5 text-sm font-bold text-ink-900 hover:bg-bone-300">Check balance</button>
+        @if ($creditEmail !== '')
+            <span class="text-sm font-semibold text-halal-600">Available: {{ $c::format($availableCreditCents) }}</span>
+        @endif
+    </form>
+
     @if ($fulfilmentMethod === 'pickup' || ($fulfilmentMethod === 'delivery' && $deliveryZone))
     <div class="mt-6 grid items-start gap-8 lg:grid-cols-[1fr_380px]">
-        <form method="post" action="{{ route('checkout.store') }}" class="space-y-5 rounded-3xl bg-white p-6 ring-1 ring-bone-200 sm:p-8">
+        <form method="post" action="{{ route('checkout.store') }}" id="checkout-form" class="space-y-5 rounded-3xl bg-white p-6 ring-1 ring-bone-200 sm:p-8">
             @csrf
             {{-- Cross-check only: the server re-prices the cart and rejects the order if this differs --}}
-            <input type="hidden" name="expected_hold_cents" value="{{ $totalHoldCents }}" />
+            <input type="hidden" name="expected_hold_cents" id="expected_hold_cents" value="{{ $totalHoldCents }}" />
             <input type="hidden" name="fulfilment_method" value="{{ $fulfilmentMethod }}" />
 
             @foreach ([['customer_name', 'Full name', 'text', 'name'], ['customer_email', 'Email (for your receipt and invoice)', 'email', 'email'], ['customer_phone', 'Phone', 'tel', 'tel']] as [$name, $label, $type, $auto])
@@ -83,15 +100,62 @@
                 <input name="notes" value="{{ old('notes') }}" maxlength="500" class="mt-1.5 block h-12 w-full rounded-xl border border-bone-300 bg-bone-50 px-3 text-base focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-100" />
             </label>
 
+            <label class="block text-sm font-semibold">
+                Coupon code (optional)
+                <input name="coupon_code" value="{{ old('coupon_code') }}" maxlength="40" class="mt-1.5 block h-12 w-full rounded-xl border border-bone-300 bg-bone-50 px-3 text-base uppercase focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-100" />
+                <span class="mt-1 block text-xs font-normal text-ink-500">Applied to your final total once your order is weighed.</span>
+            </label>
+
+            @if ($availableCreditCents > 0)
+                <label class="flex items-start gap-3 text-sm">
+                    <input type="checkbox" name="apply_store_credit" id="apply_store_credit" value="1" class="mt-1 h-4 w-4 accent-brand-700"
+                           data-credit-cents="{{ $creditToApplyCents }}" data-hold-cents="{{ $totalHoldCents }}" @checked(old('apply_store_credit')) />
+                    <span>Apply my available store credit ({{ $c::format($availableCreditCents) }}) — up to {{ $c::format($creditToApplyCents) }} off this hold.</span>
+                </label>
+                @if ($creditEmail !== '')
+                    <p class="text-xs text-ink-500">Make sure your email above matches {{ $creditEmail }} — store credit is tied to the email it was issued to.</p>
+                @endif
+            @endif
+
+            <fieldset>
+                <legend class="text-sm font-bold">How would you like to pay?</legend>
+                <div class="mt-2 space-y-1.5">
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="radio" name="payment_method" value="card" class="accent-brand-700" @checked(old('payment_method', 'card') === 'card') @disabled(! $cardReady) /> Card (Visa, Mastercard, Amex, Discover)
+                    </label>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="radio" name="payment_method" value="paypal" class="accent-brand-700" @checked(old('payment_method') === 'paypal') @disabled(! $paypalReady) /> PayPal
+                    </label>
+                    @if ($fulfilmentMethod === 'pickup')
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="radio" name="payment_method" value="cash" class="accent-brand-700" @checked(old('payment_method') === 'cash') /> Cash at pickup (orders under {{ $c::format($codMaxCents) }})
+                        </label>
+                    @endif
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend class="text-sm font-bold">Text/email updates</legend>
+                <div class="mt-2 space-y-1.5">
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" name="marketing_sms_opt_in" value="1" class="accent-brand-700" @checked(old('marketing_sms_opt_in')) /> Send me occasional deals by text
+                    </label>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" name="marketing_email_opt_in" value="1" class="accent-brand-700" @checked(old('marketing_email_opt_in')) /> Send me occasional deals by email
+                    </label>
+                    <p class="text-xs text-ink-500">Order updates (ready for pickup, out for delivery, receipts) are sent either way — reply STOP to any text to opt out of everything.</p>
+                </div>
+            </fieldset>
+
             @include('shop.partials.catch-weight-explainer', ['estimateCents' => $totalEstimatedCents, 'holdCents' => $totalHoldCents, 'tolerance' => $policy['hold_tolerance_pct']])
 
             <label class="flex items-start gap-3 text-sm">
                 <input type="checkbox" name="agree_catch_weight" value="1" required class="mt-1 h-4 w-4 accent-brand-700" @checked(old('agree_catch_weight')) />
-                <span>I understand the final price is based on actual weight, and that a hold of {{ $c::format($totalHoldCents) }} is placed on my card until my order is weighed.</span>
+                <span>I understand the final price is based on actual weight, and that a hold of {{ $c::format($totalHoldCents) }} is placed until my order is weighed.</span>
             </label>
 
-            @if ($paymentsReady)
-                <button class="h-12 w-full rounded-full bg-brand-800 text-sm font-bold text-white hover:bg-brand-700">Continue to secure payment</button>
+            @if ($cardReady || $paypalReady)
+                <button class="h-12 w-full rounded-full bg-brand-800 text-sm font-bold text-white hover:bg-brand-700">Continue to payment</button>
             @else
                 <p class="rounded-xl bg-brand-50 p-3 text-sm font-semibold text-brand-700">Online payment isn’t set up yet. Please call (267) 307-3777 to order.</p>
             @endif
@@ -121,9 +185,35 @@
                 <div class="flex justify-between"><dt class="text-ink-600">{{ $fulfilmentMethod === 'delivery' ? ($deliveryZone->name ?? 'Delivery') : 'Store pickup' }}</dt>
                     <dd>{{ $deliveryFeeCents > 0 ? $c::format($deliveryFeeCents) : 'Free' }}</dd></div>
                 <div class="flex justify-between border-t border-bone-200 pt-1.5"><dt class="font-bold text-ink-900">Estimated total</dt><dd class="font-bold tabular-nums">{{ $c::format($totalEstimatedCents) }}</dd></div>
-                <div class="flex justify-between"><dt class="text-ink-600">Card hold (estimate + {{ $policy['hold_tolerance_pct'] }}%)</dt><dd class="tabular-nums">{{ $c::format($totalHoldCents) }}</dd></div>
+                @if ($availableCreditCents > 0)
+                    <div class="flex justify-between"><dt class="text-ink-600">Store credit</dt><dd id="summary-credit" class="tabular-nums">−{{ $c::format(0) }}</dd></div>
+                @endif
+                <div class="flex justify-between"><dt class="text-ink-600">Hold (estimate + {{ $policy['hold_tolerance_pct'] }}%)</dt><dd id="summary-hold" class="tabular-nums">{{ $c::format($totalHoldCents) }}</dd></div>
             </dl>
         </aside>
     </div>
+
+    @if ($availableCreditCents > 0)
+        <script>
+            (() => {
+                const checkbox = document.getElementById('apply_store_credit');
+                const expectedHold = document.getElementById('expected_hold_cents');
+                const summaryHold = document.getElementById('summary-hold');
+                const summaryCredit = document.getElementById('summary-credit');
+                const holdCents = Number(checkbox.dataset.holdCents);
+                const creditCents = Number(checkbox.dataset.creditCents);
+                const formatCents = (cents) => '$' + (cents / 100).toFixed(2);
+
+                const update = () => {
+                    const applied = checkbox.checked ? creditCents : 0;
+                    expectedHold.value = holdCents - applied;
+                    summaryHold.textContent = formatCents(holdCents - applied);
+                    summaryCredit.textContent = '−' + formatCents(applied);
+                };
+                checkbox.addEventListener('change', update);
+                update();
+            })();
+        </script>
+    @endif
     @endif
 </x-layouts.shop>

@@ -7,22 +7,24 @@ namespace App\Actions\Delivery;
 use App\Actions\Action;
 use App\Enums\DeliveryEventType;
 use App\Enums\FulfilmentStatus;
+use App\Enums\NotificationEvent;
 use App\Enums\OrderStatus;
+use App\Jobs\DispatchOrderNotification;
 use App\Models\DeliveryEvent;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Guideline ch. 6, Sprint 05: proof of delivery via a customer-facing OTP. SMS isn't wired up until
- * Sprint 06, so the code is shown in plain on the customer's own order tracking page — the driver
+ * Guideline ch. 6, Sprint 05: proof of delivery via a customer-facing OTP, texted/emailed per Sprint
+ * 06's notification system (and still shown on the order tracking page as a fallback) — the driver
  * asks the customer for it at handoff and enters it in MarkDelivered.
  */
 final class MarkOutForDelivery extends Action
 {
     public function handle(Order $order, User $driver): Order
     {
-        return $this->transaction(function () use ($order, $driver): Order {
+        $order = $this->transaction(function () use ($order, $driver): Order {
             /** @var Order $locked */
             $locked = Order::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
 
@@ -50,5 +52,9 @@ final class MarkOutForDelivery extends Action
 
             return $order;
         });
+
+        DispatchOrderNotification::dispatch($order->id, NotificationEvent::OutForDelivery->value);
+
+        return $order;
     }
 }

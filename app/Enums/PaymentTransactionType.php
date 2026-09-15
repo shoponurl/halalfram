@@ -14,4 +14,5 @@ enum PaymentTransactionType: string
     case BalancePaid = 'balance_paid';
     case WriteOff = 'write_off';
     case Refund = 'refund';
+    case CashReceived = 'cash_received';
 }

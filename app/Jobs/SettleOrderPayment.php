@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Enums\NotificationEvent;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentTransactionType;
 use App\Models\Order;
 use App\Models\PaymentTransaction;
+use App\Payments\Exceptions\PaymentMethodNotSupported;
 use App\Payments\PaymentGateway;
+use App\Payments\PaymentGatewayFactory;
 use App\Support\Cents;
 use App\Support\SettlementPlan;
 use Illuminate\Bus\Queueable;
@@ -34,13 +37,16 @@ final class SettleOrderPayment implements ShouldQueue
 
     public function __construct(public readonly int $orderId) {}
 
-    public function handle(PaymentGateway $payments): void
+    public function handle(PaymentGatewayFactory $gateways): void
     {
-        Cache::lock("settle-order:{$this->orderId}", 120)->block(30, function () use ($payments): void {
+        Cache::lock("settle-order:{$this->orderId}", 120)->block(30, function () use ($gateways): void {
             $order = Order::query()->with(['items', 'transactions'])->findOrFail($this->orderId);
             if ($order->status !== OrderStatus::Settling) {
                 return;   // already settled by an earlier attempt
             }
+
+            /** @var PaymentGateway $payments */
+            $payments = $gateways->for($order->payment_method);
 
             $plan = SettlementPlan::for(
                 estimatedCents: $order->estimated_cents,
@@ -71,7 +77,7 @@ final class SettleOrderPayment implements ShouldQueue
     {
         $key = $order->idempotencyKey('cancel');
         if (! $this->succeeded($order, $key)) {
-            $intent = $payments->cancel((string) $order->stripe_payment_intent_id, $key);
+            $intent = $payments->cancel((string) $order->gatewayIntentId(), $key);
             $this->record($order, PaymentTransactionType::Cancel, PaymentTransaction::SUCCEEDED, 0, $intent->id, $key);
         }
         $this->writeOff($order, $plan->writeOffCents);
@@ -91,14 +97,22 @@ final class SettleOrderPayment implements ShouldQueue
 
         $key = $order->idempotencyKey("extra-charge:{$plan->balanceCents}");
         if (! $this->succeeded($order, $key)) {
-            $result = $payments->chargeOffSession(
-                (string) $order->stripe_customer_id,
-                (string) $order->stripe_payment_method_id,
-                $plan->balanceCents,
-                "Halal Brothers order {$order->number} — actual weight above estimate",
-                ['order_uuid' => $order->uuid, 'order_number' => (string) $order->number, 'purpose' => 'extra_charge'],
-                $key,
-            );
+            try {
+                $result = $payments->chargeOffSession(
+                    (string) $order->stripe_customer_id,
+                    (string) $order->stripe_payment_method_id,
+                    $plan->balanceCents,
+                    "Halal Brothers order {$order->number} — actual weight above estimate",
+                    ['order_uuid' => $order->uuid, 'order_number' => (string) $order->number, 'purpose' => 'extra_charge'],
+                    $key,
+                );
+            } catch (PaymentMethodNotSupported) {
+                // PayPal without Vault approval (guideline S06) can't recharge off-session at all —
+                // same fallback as a declined card.
+                $this->sendBalanceLink($order, $payments, $plan->balanceCents);
+
+                return;
+            }
 
             if (! $result->succeeded) {
                 // Declined or needs 3-D Secure: fall back to a payment link rather than failing the order
@@ -127,8 +141,12 @@ final class SettleOrderPayment implements ShouldQueue
         if ($this->succeeded($order, $key)) {
             return;
         }
-        $intent = $payments->capture((string) $order->stripe_payment_intent_id, $amount, $key);
+        $intent = $payments->capture((string) $order->gatewayIntentId(), $amount, $key);
         $this->record($order, PaymentTransactionType::Capture, PaymentTransaction::SUCCEEDED, $amount, $intent->id, $key);
+        if ($order->payment_method === 'paypal') {
+            // The capture id, not the authorization id, is what a later refund needs (Order::gatewayIntentId()).
+            $order->payment_reference = $intent->id;
+        }
         $order->captured_cents = $amount;
         $order->save();
     }
@@ -152,7 +170,8 @@ final class SettleOrderPayment implements ShouldQueue
         $order->balance_payment_url = $link->url;
         $order->status = OrderStatus::AwaitingBalance;
         $order->save();
-        // Sprint 06 sends this link by email/SMS; until then staff share it from the admin order page.
+
+        DispatchOrderNotification::dispatch($order->id, NotificationEvent::BalanceDue->value);
     }
 
     private function writeOff(Order $order, int $cents): void
@@ -172,6 +191,8 @@ final class SettleOrderPayment implements ShouldQueue
         $order->status = OrderStatus::Completed;
         $order->settled_at = now();
         $order->save();
+
+        DispatchOrderNotification::dispatch($order->id, NotificationEvent::Completed->value);
     }
 
     private function succeeded(Order $order, string $key): bool

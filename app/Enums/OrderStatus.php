@@ -18,6 +18,7 @@ enum OrderStatus: string
     case NeedsReview = 'needs_review';              // actual total far below estimate; manager must approve
     case Settling = 'settling';                     // weights locked; capture/charges running on the queue
     case AwaitingBalance = 'awaiting_balance';      // hold captured; payment link sent for the rest
+    case AwaitingCashPayment = 'awaiting_cash_payment'; // cash on delivery/pickup: weighed and finalized, cash due at pickup
     case Completed = 'completed';                   // fully paid (or balance written off below the minimum)
     case PaymentFailed = 'payment_failed';
     case AuthorizationExpired = 'authorization_expired';
@@ -33,6 +34,7 @@ enum OrderStatus: string
             self::NeedsReview => 'Needs manager review',
             self::Settling => 'Charging',
             self::AwaitingBalance => 'Awaiting balance payment',
+            self::AwaitingCashPayment => 'Awaiting cash payment',
             self::Completed => 'Completed',
             self::PaymentFailed => 'Payment failed',
             self::AuthorizationExpired => 'Hold expired',
@@ -44,7 +46,7 @@ enum OrderStatus: string
     {
         return match ($this) {
             self::Authorized, self::Settling, self::QcPassed => 'info',
-            self::NeedsReview, self::AwaitingBalance, self::PendingPayment, self::QcFailed => 'warning',
+            self::NeedsReview, self::AwaitingBalance, self::AwaitingCashPayment, self::PendingPayment, self::QcFailed => 'warning',
             self::Completed => 'success',
             self::PaymentFailed, self::AuthorizationExpired, self::Cancelled => 'danger',
         };

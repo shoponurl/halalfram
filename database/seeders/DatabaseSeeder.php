@@ -12,7 +12,7 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->call([RolesAndPermissionsSeeder::class, CategorySeeder::class, CatalogSeeder::class, DeliverySeeder::class]);
+        $this->call([RolesAndPermissionsSeeder::class, NotificationTemplateSeeder::class, CategorySeeder::class, CatalogSeeder::class, DeliverySeeder::class]);
 
         // Demo accounts and demo stock — local and staging only. Production owners are created with
         // `php artisan staff:create`, and real inventory comes in via /admin/lots.

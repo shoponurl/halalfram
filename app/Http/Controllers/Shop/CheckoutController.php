@@ -13,7 +13,8 @@ use App\Http\Controllers\Shop\Concerns\AuthorizesOrderAccess;
 use App\Http\Requests\CheckoutRequest;
 use App\Models\DeliverySlot;
 use App\Models\Order;
-use App\Payments\PaymentGateway;
+use App\Models\StoreCreditAccount;
+use App\Payments\PaymentGatewayFactory;
 use App\Support\Cart;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,7 +25,7 @@ final class CheckoutController extends Controller
 {
     use AuthorizesOrderAccess;
 
-    public function create(Request $request, Cart $cart, QuoteCart $quote, PaymentGateway $payments, ReserveDeliverySlot $reserveDeliverySlot): View|RedirectResponse
+    public function create(Request $request, Cart $cart, QuoteCart $quote, PaymentGatewayFactory $gateways, ReserveDeliverySlot $reserveDeliverySlot): View|RedirectResponse
     {
         if ($cart->lines() === []) {
             return redirect()->route('cart.show');
@@ -47,9 +48,14 @@ final class CheckoutController extends Controller
             }
         }
 
+        $creditEmail = strtolower(trim((string) $request->query('credit_email', '')));
+        $availableCreditCents = $creditEmail !== '' ? (StoreCreditAccount::query()->find($creditEmail)->balance_cents ?? 0) : 0;
+
         return view('shop.checkout', [
             'quote' => $quote->handle($cart->lines()),
-            'paymentsReady' => $payments->isConfigured(),
+            'cardReady' => $gateways->for('card')?->isConfigured() ?? false,
+            'paypalReady' => $gateways->for('paypal')?->isConfigured() ?? false,
+            'codMaxCents' => (int) config('catchweight.cod_max_order_cents'),
             'policy' => config('catchweight'),
             'fulfilmentMethod' => $method,
             'zip' => $zip,
@@ -57,6 +63,8 @@ final class CheckoutController extends Controller
             'zipError' => $zipError,
             'slots' => $slots,
             'deliveryFeeCents' => $deliveryZone->flat_fee_cents ?? 0,
+            'creditEmail' => $creditEmail,
+            'availableCreditCents' => $availableCreditCents,
         ]);
     }
 
@@ -72,6 +80,8 @@ final class CheckoutController extends Controller
                 'customer_email' => strtolower((string) $data['customer_email']),
                 'customer_phone' => (string) $data['customer_phone'],
                 'notes' => $data['notes'] ?? null,
+                'marketing_sms_opt_in' => (bool) ($data['marketing_sms_opt_in'] ?? false),
+                'marketing_email_opt_in' => (bool) ($data['marketing_email_opt_in'] ?? false),
             ],
             expectedHoldCents: (int) $data['expected_hold_cents'],
             fulfilment: $isDelivery ? [
@@ -84,6 +94,9 @@ final class CheckoutController extends Controller
                 'delivery_slot_id' => (int) $data['delivery_slot_id'],
             ] : ['method' => 'pickup'],
             user: $request->user(),
+            paymentMethod: (string) $data['payment_method'],
+            couponCode: $data['coupon_code'] ?? null,
+            applyStoreCredit: (bool) ($data['apply_store_credit'] ?? false),
         );
 
         $order = $result['order'];
@@ -93,7 +106,7 @@ final class CheckoutController extends Controller
         return redirect()->route('checkout.pay', $order);
     }
 
-    public function pay(Request $request, Order $order, PaymentGateway $payments): View|RedirectResponse
+    public function pay(Request $request, Order $order, PaymentGatewayFactory $gateways): View|RedirectResponse
     {
         $this->authorizeOrderAccess($request, $order);
 
@@ -101,12 +114,13 @@ final class CheckoutController extends Controller
             return redirect()->route('orders.show', $order);
         }
 
-        $intent = $payments->retrieveIntent((string) $order->stripe_payment_intent_id);
+        $payments = $gateways->for($order->payment_method);
+        $intent = $payments?->retrieveIntent((string) $order->gatewayIntentId());
 
         return view('shop.pay', [
             'order' => $order,
-            'clientSecret' => $intent->clientSecret,
-            'publishableKey' => $payments->publishableKey(),
+            'clientSecret' => $intent?->clientSecret,
+            'publishableKey' => $payments?->publishableKey(),
             'returnUrl' => route('orders.show', $order),
         ]);
     }

@@ -34,4 +34,5 @@ Create real staff in production with `php artisan staff:create`.
 - [x] **Sprint 03: inventory, lot & cold storage.** See [docs/sprint-03.md](docs/sprint-03.md) — real stock still needs receiving via `/admin/lots` in staging.
 - [x] **Sprint 04: order processing & the butcher workflow.** See [docs/sprint-04.md](docs/sprint-04.md) — Reverb (live updates) deliberately deferred; the production board polls instead.
 - [x] **Sprint 05: local delivery & pickup.** See [docs/sprint-05.md](docs/sprint-05.md) — real service zones/zips/slots and a real cron/`schedule:work` for the missed-pickup job still need setting up in staging/production.
-- [ ] Sprint 06: customer notifications (SMS/email)
+- [x] **Sprint 06: payment completion & notifications.** See [docs/sprint-06.md](docs/sprint-06.md) — real PayPal/Twilio/Postmark credentials, 10DLC registration, PayPal Vault approval, a PA sales-tax determination and SPF/DKIM/DMARC DNS records still need setting up before launch.
+- [ ] Sprint 07: admin, reports & compliance

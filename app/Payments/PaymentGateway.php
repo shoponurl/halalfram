@@ -32,6 +32,13 @@ interface PaymentGateway
 
     public function retrieveIntent(string $intentId): IntentState;
 
+    /**
+     * Completes an authorization that needed the customer to leave our site (guideline ch. 6, Sprint 06:
+     * PayPal's approval redirect). Stripe's Payment Element confirms client-side, so its implementation
+     * is a passthrough to retrieveIntent() — there's nothing left to confirm by the time this is called.
+     */
+    public function confirmAuthorization(string $intentId, string $idempotencyKey): IntentState;
+
     public function capture(string $intentId, int $amountCents, string $idempotencyKey): IntentState;
 
     public function cancel(string $intentId, string $idempotencyKey): IntentState;

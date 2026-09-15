@@ -30,6 +30,12 @@ final class CheckoutRequest extends FormRequest
             'delivery_state' => ['required_if:fulfilment_method,delivery', 'nullable', 'string', 'size:2'],
             'delivery_zip' => ['required_if:fulfilment_method,delivery', 'nullable', 'string', 'regex:/^\d{5}$/'],
             'delivery_slot_id' => ['required_if:fulfilment_method,delivery', 'nullable', 'integer', 'exists:delivery_slots,id'],
+            // Guideline ch. 6, Sprint 06: cash is pickup-only (checked again server-side in PlaceOrder).
+            'payment_method' => ['required', 'in:card,paypal,cash'],
+            'coupon_code' => ['nullable', 'string', 'max:40'],
+            'apply_store_credit' => ['nullable', 'boolean'],
+            'marketing_sms_opt_in' => ['nullable', 'boolean'],
+            'marketing_email_opt_in' => ['nullable', 'boolean'],
             // Rule 02 / gap 02: the client never sends money or price fields. Reject rather than ignore.
             'amount' => ['prohibited'],
             'amount_cents' => ['prohibited'],
@@ -39,6 +45,9 @@ final class CheckoutRequest extends FormRequest
             'total' => ['prohibited'],
             'estimated_cents' => ['prohibited'],
             'delivery_fee_cents' => ['prohibited'],
+            'tax_cents' => ['prohibited'],
+            'discount_cents' => ['prohibited'],
+            'store_credit_applied_cents' => ['prohibited'],
         ];
     }
 

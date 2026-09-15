@@ -7,6 +7,8 @@ namespace App\Actions\Delivery;
 use App\Actions\Action;
 use App\Enums\DeliveryEventType;
 use App\Enums\FulfilmentStatus;
+use App\Enums\NotificationEvent;
+use App\Jobs\DispatchOrderNotification;
 use App\Models\DeliveryEvent;
 use App\Models\Order;
 use App\Models\User;
@@ -17,7 +19,7 @@ final class MarkDelivered extends Action
 {
     public function handle(Order $order, User $driver, ?string $otp = null, ?string $proofPhotoPath = null): Order
     {
-        return $this->transaction(function () use ($order, $driver, $otp, $proofPhotoPath): Order {
+        $order = $this->transaction(function () use ($order, $driver, $otp, $proofPhotoPath): Order {
             /** @var Order $locked */
             $locked = Order::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
 
@@ -43,5 +45,9 @@ final class MarkDelivered extends Action
 
             return $order;
         });
+
+        DispatchOrderNotification::dispatch($order->id, NotificationEvent::Delivered->value);
+
+        return $order;
     }
 }

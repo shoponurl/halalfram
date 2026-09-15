@@ -28,13 +28,23 @@ class OrderInfolist
                         TextEntry::make('status')->badge()
                             ->formatStateUsing(fn (OrderStatus $state) => $state->label())
                             ->color(fn (OrderStatus $state) => $state->color()),
+                        TextEntry::make('payment_method')->label('Payment method')
+                            ->formatStateUsing(fn (string $state) => match ($state) {
+                                'card' => 'Card', 'paypal' => 'PayPal', 'cash' => 'Cash on pickup', default => $state
+                            }),
                         TextEntry::make('scheduled_date')->label('Scheduled for')->date('D, M j')->placeholder('—'),
                         TextEntry::make('estimated_cents')->label('Estimate')->formatStateUsing($money),
                         TextEntry::make('hold_cents')
-                            ->label(fn (Order $record) => 'Card hold (estimate + '.rtrim(rtrim($record->hold_tolerance_pct, '0'), '.').'%)')
+                            ->label(fn (Order $record) => 'Hold (estimate + '.rtrim(rtrim($record->hold_tolerance_pct, '0'), '.').'%)')
                             ->formatStateUsing($money),
+                        TextEntry::make('store_credit_applied_cents')->label('Store credit applied')->formatStateUsing($money)
+                            ->visible(fn (Order $record) => $record->store_credit_applied_cents > 0),
+                        TextEntry::make('discount_cents')->label('Coupon discount')->formatStateUsing($money)
+                            ->visible(fn (Order $record) => $record->discount_cents > 0),
+                        TextEntry::make('tax_cents')->label('Tax')->formatStateUsing($money)
+                            ->visible(fn (Order $record) => $record->tax_cents > 0),
                         TextEntry::make('final_cents')->label('Actual total')->formatStateUsing($money)->placeholder('Not finalized'),
-                        TextEntry::make('captured_cents')->label('Captured from hold')->formatStateUsing($money),
+                        TextEntry::make('captured_cents')->label(fn (Order $record) => $record->payment_method === 'cash' ? 'Cash collected' : 'Captured from hold')->formatStateUsing($money),
                         TextEntry::make('extra_charged_cents')->label('Charged above hold')->formatStateUsing($money),
                         TextEntry::make('balance_due_cents')->label('Balance due')->formatStateUsing($money)
                             ->color(fn (int $state) => $state > 0 ? 'danger' : null),

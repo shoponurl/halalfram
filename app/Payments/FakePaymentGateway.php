@@ -10,6 +10,7 @@ use App\Payments\Data\IntentState;
 use App\Payments\Data\RefundResult;
 use App\Payments\Data\WebhookEvent;
 use App\Payments\Exceptions\InvalidWebhookSignature;
+use App\Payments\Exceptions\PaymentMethodNotSupported;
 use Carbon\CarbonImmutable;
 use RuntimeException;
 
@@ -35,6 +36,9 @@ final class FakePaymentGateway implements PaymentGateway
     public bool $declineHold = false;
 
     public bool $declineRefund = false;
+
+    /** Simulates a gateway with no off-session recharge capability (guideline S06: PayPal without Vault approval). */
+    public bool $offSessionUnsupported = false;
 
     private int $sequence = 0;
 
@@ -80,6 +84,17 @@ final class FakePaymentGateway implements PaymentGateway
         return $this->intent($intentId);
     }
 
+    /** Test helper: what a PayPal-style return page does once the buyer approves and we confirm it. */
+    public function confirmAuthorization(string $intentId, string $idempotencyKey): IntentState
+    {
+        return $this->once($idempotencyKey, function () use ($intentId): IntentState {
+            $i = $this->intent($intentId);
+
+            return $this->intents[$intentId] = new IntentState($i->id, 'requires_capture', $i->amountCents, $i->amountCents, 0,
+                $i->clientSecret, $i->paymentMethodId, CarbonImmutable::now()->addDays(7), $i->metadata);
+        });
+    }
+
     public function capture(string $intentId, int $amountCents, string $idempotencyKey): IntentState
     {
         return $this->once($idempotencyKey, function () use ($intentId, $amountCents, $idempotencyKey) {
@@ -106,6 +121,10 @@ final class FakePaymentGateway implements PaymentGateway
 
     public function chargeOffSession(string $customerId, string $paymentMethodId, int $amountCents, string $description, array $metadata, string $idempotencyKey): ChargeResult
     {
+        if ($this->offSessionUnsupported) {
+            throw new PaymentMethodNotSupported('This gateway cannot charge a saved payment method off-session.');
+        }
+
         return $this->once($idempotencyKey, function () use ($amountCents, $idempotencyKey) {
             $this->calls[] = ['operation' => 'off_session', 'key' => $idempotencyKey, 'amount' => $amountCents];
 

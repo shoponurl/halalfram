@@ -26,6 +26,9 @@
                     <a href="{{ $order->balance_payment_url }}" class="mt-4 inline-flex h-12 items-center rounded-full bg-brand-800 px-8 text-sm font-bold text-white hover:bg-brand-700">Pay {{ $c::format($order->balance_due_cents) }}</a>
                 @endif
                 @break
+            @case($s::AwaitingCashPayment)
+                <p>Your order is cut and ready — please bring <strong>{{ $c::format($order->final_cents) }}</strong> in cash to the shop at pickup.</p>
+                @break
             @case($s::Completed)
                 <p>Paid in full: {{ $c::format($order->totalChargedCents()) }}. Your invoice shows the estimate and the weight adjustment.</p>
                 @break
@@ -59,13 +62,19 @@
 
     <dl class="mt-6 ml-auto max-w-sm space-y-1.5 text-sm">
         <div class="flex justify-between"><dt class="text-ink-600">Estimated</dt><dd class="tabular-nums">{{ $c::format($order->estimated_cents) }}</dd></div>
-        <div class="flex justify-between"><dt class="text-ink-600">Card hold</dt><dd class="tabular-nums">{{ $c::format($order->hold_cents) }}</dd></div>
+        @if ($order->store_credit_applied_cents > 0)
+            <div class="flex justify-between"><dt class="text-ink-600">Store credit applied</dt><dd class="tabular-nums">−{{ $c::format($order->store_credit_applied_cents) }}</dd></div>
+        @endif
+        <div class="flex justify-between"><dt class="text-ink-600">Hold ({{ $order->payment_method === 'cash' ? 'cash on pickup' : ucfirst($order->payment_method) }})</dt><dd class="tabular-nums">{{ $c::format($order->hold_cents) }}</dd></div>
+        @if ($order->discount_cents > 0)
+            <div class="flex justify-between"><dt class="text-ink-600">Coupon discount</dt><dd class="tabular-nums">−{{ $c::format($order->discount_cents) }}</dd></div>
+        @endif
         @if ($order->final_cents !== null)
             <div class="flex justify-between border-t border-bone-200 pt-2 text-base"><dt class="font-bold">Actual total</dt><dd class="font-extrabold tabular-nums">{{ $c::format($order->final_cents) }}</dd></div>
         @endif
     </dl>
 
-    @if (in_array($order->status, [$s::Completed, $s::AwaitingBalance], true))
+    @if (in_array($order->status, [$s::Completed, $s::AwaitingBalance, $s::AwaitingCashPayment], true))
         <p class="mt-6 text-right"><a href="{{ route('orders.invoice', $order) }}" class="font-semibold text-brand-700 underline">Download invoice (PDF)</a></p>
     @endif
 

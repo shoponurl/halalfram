@@ -69,6 +69,12 @@ final class StripeGateway implements PaymentGateway
         return $this->toState($this->client()->paymentIntents->retrieve($intentId, ['expand' => ['latest_charge']]));
     }
 
+    public function confirmAuthorization(string $intentId, string $idempotencyKey): IntentState
+    {
+        // The customer already confirmed client-side via the Payment Element; nothing more to do.
+        return $this->retrieveIntent($intentId);
+    }
+
     public function capture(string $intentId, int $amountCents, string $idempotencyKey): IntentState
     {
         $intent = $this->client()->paymentIntents->capture($intentId, ['amount_to_capture' => $amountCents], ['idempotency_key' => $idempotencyKey]);

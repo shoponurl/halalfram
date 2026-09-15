@@ -7,25 +7,27 @@ namespace App\Actions\Delivery;
 use App\Actions\Action;
 use App\Enums\DeliveryEventType;
 use App\Enums\FulfilmentStatus;
+use App\Enums\NotificationEvent;
 use App\Enums\OrderStatus;
+use App\Jobs\DispatchOrderNotification;
 use App\Models\DeliveryEvent;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
-/** Guideline ch. 6, Sprint 05: store pickup flow + a "ready" notification (tracking page, for now). */
+/** Guideline ch. 6, Sprint 05: store pickup flow, notified per Sprint 06's template/dedupe system. */
 final class MarkReadyForPickup extends Action
 {
     public function handle(Order $order, User $by): Order
     {
-        return $this->transaction(function () use ($order, $by): Order {
+        $order = $this->transaction(function () use ($order, $by): Order {
             /** @var Order $locked */
             $locked = Order::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
 
             if ($locked->fulfilment !== 'pickup') {
                 throw ValidationException::withMessages(['fulfilment' => 'This order is for delivery, not pickup.']);
             }
-            if (! in_array($locked->status, [OrderStatus::Completed, OrderStatus::AwaitingBalance], true)) {
+            if (! in_array($locked->status, [OrderStatus::Completed, OrderStatus::AwaitingBalance, OrderStatus::AwaitingCashPayment], true)) {
                 throw ValidationException::withMessages(['fulfilment' => 'The order isn’t paid yet.']);
             }
             if ($locked->fulfilment_status !== FulfilmentStatus::AwaitingFulfilment) {
@@ -45,5 +47,9 @@ final class MarkReadyForPickup extends Action
 
             return $order;
         });
+
+        DispatchOrderNotification::dispatch($order->id, NotificationEvent::ReadyForPickup->value);
+
+        return $order;
     }
 }

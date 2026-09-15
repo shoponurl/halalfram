@@ -13,6 +13,7 @@ use App\Enums\Role;
 use App\Enums\WeightSource;
 use App\Jobs\SettleOrderPayment;
 use App\Models\Order;
+use App\Payments\PaymentGatewayFactory;
 use App\Support\SettlementPlan;
 use App\Support\Weight;
 use Illuminate\Support\Facades\Queue;
@@ -241,7 +242,7 @@ it('settlement is idempotent under retry: each Stripe call happens once per idem
     app(FinalizeOrder::class)->handle($order->fresh(), $this->frontDesk);
 
     // Simulate a queue retry of the same settlement job after it already succeeded
-    app(SettleOrderPayment::class, ['orderId' => $order->id])->handle($this->gateway);
+    app(SettleOrderPayment::class, ['orderId' => $order->id])->handle(app(PaymentGatewayFactory::class));
 
     expect($this->gateway->callsFor('capture'))->toHaveCount(1);
 });

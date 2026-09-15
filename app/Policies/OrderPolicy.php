@@ -75,9 +75,20 @@ class OrderPolicy
         return $user->can(Permission::RecordWeights->value) && $order->status !== OrderStatus::PendingPayment;
     }
 
-    /** Guideline ch. 6, Sprint 05: pickup/delivery status only moves once the order is actually paid. */
+    /**
+     * Guideline ch. 6, Sprint 05: pickup/delivery status only moves once the order is actually paid —
+     * or, for cash on pickup (S06), once it's finalized and ready to collect cash for.
+     */
     public function manageFulfilment(User $user, Order $order): bool
     {
-        return $user->can(Permission::ManageDeliveries->value) && in_array($order->status, [OrderStatus::Completed, OrderStatus::AwaitingBalance], true);
+        return $user->can(Permission::ManageDeliveries->value)
+            && in_array($order->status, [OrderStatus::Completed, OrderStatus::AwaitingBalance, OrderStatus::AwaitingCashPayment], true);
+    }
+
+    /** Guideline ch. 7, S06: cash on delivery/pickup — front desk/manager collects and records it. */
+    public function recordCashPayment(User $user, Order $order): bool
+    {
+        return $user->can(Permission::ManageOrders->value)
+            && $order->payment_method === 'cash' && $order->status === OrderStatus::AwaitingCashPayment;
     }
 }

@@ -4,22 +4,29 @@ declare(strict_types=1);
 
 use App\Enums\CutStyle;
 use App\Enums\LotStatus;
+use App\Enums\NotificationEvent;
 use App\Enums\Role;
 use App\Enums\Species;
 use App\Enums\StorageLocation;
 use App\Models\Animal;
 use App\Models\Category;
+use App\Models\Coupon;
 use App\Models\CutOption;
 use App\Models\DeliverySlot;
 use App\Models\DeliveryZone;
 use App\Models\Lot;
+use App\Models\NotificationTemplate;
 use App\Models\OffalOption;
 use App\Models\PackingOption;
 use App\Models\Product;
 use App\Models\ServiceZip;
+use App\Models\StoreCreditAccount;
 use App\Models\User;
 use App\Payments\FakePaymentGateway;
 use App\Payments\PaymentGateway;
+use App\Payments\PayPalGateway;
+use App\Sms\FakeSmsGateway;
+use App\Sms\SmsGateway;
 use App\Support\Weight;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -48,13 +55,51 @@ function staff(Role $role, bool $withTwoFactor = true, bool $active = true): Use
     return $user->fresh();
 }
 
-/** Swaps the real Stripe client for the in-memory fake and returns it so a test can inspect/drive it. */
+/**
+ * Swaps the real Stripe *and* PayPal clients for one in-memory fake and returns it so a test can
+ * inspect/drive it — both gateways share the same interface (App\Payments\PaymentGateway), so one
+ * fake instance can stand in for either, or both at once, in a test.
+ */
 function fakePayments(): FakePaymentGateway
 {
     $fake = new FakePaymentGateway;
     app()->instance(PaymentGateway::class, $fake);
+    app()->instance(PayPalGateway::class, $fake);
 
     return $fake;
+}
+
+/** Swaps the real Twilio client for the in-memory fake and returns it. */
+function fakeSms(): FakeSmsGateway
+{
+    $fake = new FakeSmsGateway;
+    app()->instance(SmsGateway::class, $fake);
+
+    return $fake;
+}
+
+/** An active notification template for the given event/channel — most tests don't need real copy. */
+function notificationTemplate(NotificationEvent $event, string $channel = 'sms', string $body = 'Order {{order_number}}: {{tracking_url}}'): NotificationTemplate
+{
+    return NotificationTemplate::query()->create([
+        'event' => $event,
+        'channel' => $channel,
+        'subject' => $channel === 'email' ? 'Order {{order_number}}' : null,
+        'body' => $body,
+        'active' => true,
+    ]);
+}
+
+/** An active coupon, e.g. coupon(type: 'percent', value: 10). */
+function coupon(string $code = 'SAVE10', string $type = 'percent', int $value = 10): Coupon
+{
+    return Coupon::query()->create(['code' => $code, 'type' => $type, 'value' => $value, 'active' => true]);
+}
+
+/** Issues store credit directly (bypassing IssueStoreCredit's audit trail) for test setup. */
+function storeCredit(string $email, int $balanceCents): StoreCreditAccount
+{
+    return StoreCreditAccount::query()->create(['customer_email' => $email, 'balance_cents' => $balanceCents]);
 }
 
 /** A minimal active catch-weight product, e.g. product(priceCents: 349, estLb: '3.5'). */

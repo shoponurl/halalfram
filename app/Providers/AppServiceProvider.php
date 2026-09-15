@@ -5,8 +5,13 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Models\User;
+use App\Payments\NullTaxCalculator;
 use App\Payments\PaymentGateway;
+use App\Payments\PayPalGateway;
 use App\Payments\StripeGateway;
+use App\Payments\TaxCalculator;
+use App\Sms\SmsGateway;
+use App\Sms\TwilioSmsGateway;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
@@ -27,6 +32,22 @@ class AppServiceProvider extends ServiceProvider
             publishableKey: config('services.stripe.key'),
             webhookSecret: config('services.stripe.webhook_secret'),
             currency: (string) config('catchweight.currency'),
+        ));
+
+        $this->app->singleton(PayPalGateway::class, fn () => new PayPalGateway(
+            clientId: config('services.paypal.client_id'),
+            clientSecret: config('services.paypal.client_secret'),
+            mode: (string) config('services.paypal.mode'),
+            currency: (string) config('catchweight.currency'),
+        ));
+
+        $this->app->singleton(TaxCalculator::class, NullTaxCalculator::class);
+
+        $this->app->singleton(SmsGateway::class, fn () => new TwilioSmsGateway(
+            accountSid: config('services.twilio.sid'),
+            authToken: config('services.twilio.token'),
+            messagingServiceSid: config('services.twilio.messaging_service_sid'),
+            fromNumber: config('services.twilio.from'),
         ));
     }
 

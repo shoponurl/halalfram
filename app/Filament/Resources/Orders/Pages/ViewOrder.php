@@ -12,6 +12,7 @@ use App\Actions\Delivery\MarkReadyForPickup;
 use App\Actions\Delivery\RescheduleDelivery;
 use App\Actions\Orders\ApproveUnderweight;
 use App\Actions\Orders\FinalizeOrder;
+use App\Actions\Orders\RecordCashPayment;
 use App\Actions\Orders\RecordQcCheck;
 use App\Enums\FulfilmentStatus;
 use App\Enums\OrderStatus;
@@ -21,6 +22,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Support\Cents;
 use App\Support\CuttingSheetPdf;
+use App\Support\DollarInput;
 use App\Support\SettlementPlan;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
@@ -115,6 +117,25 @@ class ViewOrder extends ViewRecord
                     .rtrim(rtrim($record->underweight_review_pct, '0'), '.').'% below the estimate of '.Cents::format($record->estimated_cents)
                     .'. If a weight was mistyped, close this and record the correct weight instead. Approving charges the lower amount and releases the rest of the hold.')
                 ->action(fn (Order $record) => $this->runFinalize(fn (User $user) => app(ApproveUnderweight::class)->handle($record, $user))),
+
+            Action::make('recordCashPayment')
+                ->label('Record cash payment')
+                ->icon('heroicon-o-banknotes')
+                ->color('success')
+                ->authorize(fn (Order $record) => auth()->user()?->can('recordCashPayment', $record) ?? false)
+                ->visible(fn (Order $record) => $record->payment_method === 'cash' && $record->status === OrderStatus::AwaitingCashPayment)
+                ->schema([
+                    TextInput::make('amount_tendered')
+                        ->label('Cash tendered ($)')
+                        ->required()
+                        ->rule('regex:/^\$?\d{1,4}(\.\d{1,2})?$/')
+                        ->prefix('$')
+                        ->default(fn (Order $record) => Cents::format($record->final_cents)),
+                ])
+                ->action(fn (Order $record, array $data) => $this->runFulfilment(
+                    fn (User $user) => app(RecordCashPayment::class)->handle($record, DollarInput::toCents((string) $data['amount_tendered']), $user),
+                    'Cash payment recorded',
+                )),
 
             Action::make('invoice')
                 ->label('Invoice PDF')

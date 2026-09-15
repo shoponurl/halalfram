@@ -6,11 +6,12 @@ namespace App\Jobs;
 
 use App\Enums\DeliveryEventType;
 use App\Enums\FulfilmentStatus;
+use App\Enums\NotificationEvent;
 use App\Enums\PaymentTransactionType;
 use App\Models\DeliveryEvent;
 use App\Models\Order;
 use App\Models\PaymentTransaction;
-use App\Payments\PaymentGateway;
+use App\Payments\PaymentGatewayFactory;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -38,20 +39,24 @@ final class RefundFulfilment implements ShouldQueue
         public readonly string $reason,
     ) {}
 
-    public function handle(PaymentGateway $payments): void
+    public function handle(PaymentGatewayFactory $gateways): void
     {
-        Cache::lock("refund-order:{$this->orderId}", 60)->block(30, function () use ($payments): void {
+        $notify = Cache::lock("refund-order:{$this->orderId}", 60)->block(30, function () use ($gateways): bool {
             $order = Order::query()->findOrFail($this->orderId);
-            if ($this->amountCents <= 0 || $order->stripe_payment_intent_id === null) {
-                return;
+            if ($this->amountCents <= 0 || $order->gatewayIntentId() === null) {
+                return false;
             }
 
             $key = $order->idempotencyKey("refund:{$this->reason}");
             if (PaymentTransaction::query()->where('order_id', $order->id)->where('idempotency_key', $key)->where('status', PaymentTransaction::SUCCEEDED)->exists()) {
-                return;
+                return false;
             }
 
-            $result = $payments->refund((string) $order->stripe_payment_intent_id, $this->amountCents, $key);
+            $payments = $gateways->for($order->payment_method);
+            if ($payments === null) {
+                return false;
+            }
+            $result = $payments->refund((string) $order->gatewayIntentId(), $this->amountCents, $key);
 
             $transaction = new PaymentTransaction;
             $transaction->fill([
@@ -67,7 +72,7 @@ final class RefundFulfilment implements ShouldQueue
             if (! $result->succeeded) {
                 Log::critical('Fulfilment refund failed — needs manual attention', ['order_id' => $order->id, 'reason' => $this->reason, 'error' => $result->failureMessage]);
 
-                return;
+                return false;
             }
 
             $order->refunded_cents += $this->amountCents;
@@ -77,7 +82,13 @@ final class RefundFulfilment implements ShouldQueue
             $event = new DeliveryEvent;
             $event->fill(['type' => DeliveryEventType::Refunded, 'note' => $this->reason]);
             $order->deliveryEvents()->save($event);
+
+            return true;
         });
+
+        if ($notify) {
+            DispatchOrderNotification::dispatch($this->orderId, NotificationEvent::Refunded->value);
+        }
     }
 
     public function failed(Throwable $e): void

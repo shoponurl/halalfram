@@ -64,4 +64,9 @@ return [
 
     // The customer's share of a written-off missed pickup; the rest covers the wasted product.
     'pickup_writeoff_refund_pct' => 80,
+
+    // Owner decisions (guideline ch. 7, S06, recorded 2026-09-15):
+    // Cash on pickup is capped so a no-show can't leave too much wasted, never-billed product on the
+    // books — start narrow; raise it once the real no-show rate is known.
+    'cod_max_order_cents' => 15000, // $150
 ];

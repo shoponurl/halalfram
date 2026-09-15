@@ -21,7 +21,9 @@ use LogicException;
  * @property string|null $stripe_object_id
  * @property string|null $idempotency_key
  * @property string|null $failure_message
+ * @property int|null $recorded_by
  * @property Carbon $created_at
+ * @property-read User|null $recorder
  */
 class PaymentTransaction extends Model
 {
@@ -63,5 +65,11 @@ class PaymentTransaction extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function recorder(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recorded_by');
     }
 }

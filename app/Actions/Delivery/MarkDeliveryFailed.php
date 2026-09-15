@@ -7,6 +7,8 @@ namespace App\Actions\Delivery;
 use App\Actions\Action;
 use App\Enums\DeliveryEventType;
 use App\Enums\FulfilmentStatus;
+use App\Enums\NotificationEvent;
+use App\Jobs\DispatchOrderNotification;
 use App\Jobs\RefundFulfilment;
 use App\Models\DeliveryEvent;
 use App\Models\Order;
@@ -51,6 +53,9 @@ final class MarkDeliveryFailed extends Action
 
         if ($refundCents > 0) {
             RefundFulfilment::dispatch($updated->id, $refundCents, 'delivery_failed_final');
+        } else {
+            // Still has a free re-attempt left — RefundFulfilment sends its own notification on the final failure.
+            DispatchOrderNotification::dispatch($updated->id, NotificationEvent::DeliveryFailed->value);
         }
 
         return $updated;

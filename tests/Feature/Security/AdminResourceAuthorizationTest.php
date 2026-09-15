@@ -65,6 +65,12 @@ $deliveryConfigRoutes = [
 $driverRouteRoutes = [
     'driver-route' => fn () => '/admin/driver-route',
 ];
+$paymentsConfigRoutes = [
+    'coupons.list' => fn () => '/admin/coupons',
+    'coupons.create' => fn () => '/admin/coupons/create',
+    'store-credit.list' => fn () => '/admin/store-credit-accounts',
+    'notification-templates.list' => fn () => '/admin/notification-templates',
+];
 
 // Only Owner, Manager, Front desk, Butcher and Accountant have orders.view (App\Enums\Role::permissions())
 $canViewOrders = [Role::Owner, Role::Manager, Role::FrontDesk, Role::Butcher, Role::Accountant];
@@ -140,6 +146,17 @@ $canManageDeliveries = [Role::Owner, Role::Manager, Role::Driver];
 foreach (Role::cases() as $role) {
     $expected = in_array($role, $canManageDeliveries, true) ? 200 : 403;
     foreach ($driverRouteRoutes as $name => $url) {
+        it("returns {$expected} for {$role->label()} on {$name}", function () use ($role, $url, $expected) {
+            $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
+        });
+    }
+}
+
+// Only Owner and Manager have catalog.manage — coupons, store credit and notification copy are
+// manager-level settings (guideline ch. 6, Sprint 06)
+foreach (Role::cases() as $role) {
+    $expected = in_array($role, $canManageCatalog, true) ? 200 : 403;
+    foreach ($paymentsConfigRoutes as $name => $url) {
         it("returns {$expected} for {$role->label()} on {$name}", function () use ($role, $url, $expected) {
             $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
         });
