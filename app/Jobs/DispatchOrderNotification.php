@@ -117,6 +117,9 @@ final class DispatchOrderNotification implements ShouldQueue
             'balance_due' => Cents::format($order->balance_due_cents),
             'refund_amount' => Cents::format($order->refunded_cents),
             'pickup_deadline_hours' => (string) config('catchweight.pickup_writeoff_hours'),
+            'carrier' => (string) $order->shipping_carrier,
+            'carrier_tracking_number' => (string) $order->tracking_number,
+            'carrier_tracking_url' => (string) $order->tracking_url,
         ];
     }
 

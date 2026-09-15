@@ -6,6 +6,7 @@ namespace App\Filament\Resources\Orders\Schemas;
 
 use App\Enums\FulfilmentStatus;
 use App\Enums\OrderStatus;
+use App\Enums\PackageTemperature;
 use App\Models\Order;
 use App\Support\Cents;
 use Filament\Infolists\Components\TextEntry;
@@ -74,7 +75,7 @@ class OrderInfolist
                             ->color(fn (FulfilmentStatus $state) => $state->color()),
                         TextEntry::make('refunded_cents')->label('Refunded')->formatStateUsing($money)->visible(fn (Order $record) => $record->refunded_cents > 0),
                         TextEntry::make('delivery_address')->label('Address')->state(fn (Order $record) => $record->fullDeliveryAddress())
-                            ->visible(fn (Order $record) => $record->fulfilment === 'delivery')->columnSpan(2),
+                            ->visible(fn (Order $record) => in_array($record->fulfilment, ['delivery', 'shipping'], true))->columnSpan(2),
                         TextEntry::make('deliveryZone.name')->label('Zone / fee')
                             ->formatStateUsing(fn (?string $state, Order $record) => trim(($state ?? '—').' · '.Cents::format($record->delivery_fee_cents)))
                             ->visible(fn (Order $record) => $record->fulfilment === 'delivery'),
@@ -84,6 +85,23 @@ class OrderInfolist
                             ->visible(fn (Order $record) => $record->fulfilment === 'delivery'),
                         TextEntry::make('delivery_otp')->label('Customer code')->placeholder('—')
                             ->visible(fn (Order $record) => $record->fulfilment_status === FulfilmentStatus::OutForDelivery),
+                        TextEntry::make('package_temperature')->label('Ships')
+                            ->formatStateUsing(fn (?PackageTemperature $state) => $state?->label() ?? '—')
+                            ->visible(fn (Order $record) => $record->fulfilment === 'shipping'),
+                        TextEntry::make('scheduled_ship_date')->label('Ship date')->date('D, M j')->placeholder('—')
+                            ->visible(fn (Order $record) => $record->fulfilment === 'shipping'),
+                        TextEntry::make('shipping_rate_cents')->label('Shipping charged')->formatStateUsing($money)
+                            ->visible(fn (Order $record) => $record->fulfilment === 'shipping'),
+                        TextEntry::make('shipping_carrier')->label('Carrier / service')
+                            ->formatStateUsing(fn (?string $state, Order $record) => $state === null ? '—' : "{$state} — {$record->shipping_service}")
+                            ->visible(fn (Order $record) => $record->fulfilment === 'shipping'),
+                        TextEntry::make('tracking_number')->label('Tracking')
+                            ->url(fn (?string $state, Order $record) => $state !== null ? $record->tracking_url : null)
+                            ->openUrlInNewTab()->placeholder('—')
+                            ->visible(fn (Order $record) => $record->fulfilment === 'shipping'),
+                        TextEntry::make('shipping_label_url')->label('Shipping label')
+                            ->url(fn (?string $state) => $state)->openUrlInNewTab()->placeholder('—')
+                            ->visible(fn (Order $record) => $record->fulfilment === 'shipping'),
                     ]),
                 Section::make('Policy snapshot at checkout')
                     ->columnSpanFull()

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\EasyPostWebhookController;
 use App\Http\Controllers\Shop\CartController;
 use App\Http\Controllers\Shop\CategoryController;
 use App\Http\Controllers\Shop\CheckoutController;
@@ -38,6 +39,7 @@ Route::view('/orders/{order}/balance-paid', 'shop.balance-paid')->name('orders.b
 
 Route::post('/stripe/webhook', StripeWebhookController::class)->name('stripe.webhook');
 Route::post('/webhooks/twilio/sms', TwilioWebhookController::class)->name('twilio.webhook');
+Route::post('/webhooks/easypost/tracking', EasyPostWebhookController::class)->name('easypost.webhook');
 
 // Guideline ch. 7, S07: legal/compliance pages and the public CCPA request form.
 Route::view('/privacy', 'shop.legal.privacy')->name('legal.privacy');

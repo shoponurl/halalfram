@@ -1,10 +1,10 @@
 @php($c = \App\Support\Cents::class)
-@php($totalEstimatedCents = $quote['estimated_cents'] + $deliveryFeeCents)
-@php($totalHoldCents = $quote['hold_cents'] + $deliveryFeeCents)
+@php($totalEstimatedCents = $quote['estimated_cents'] + $deliveryFeeCents + $shippingRateCents)
+@php($totalHoldCents = $quote['hold_cents'] + $deliveryFeeCents + $shippingRateCents)
 @php($creditToApplyCents = min($availableCreditCents, max(0, $totalHoldCents - $policy['minimum_charge_cents'])))
 <x-layouts.shop title="Checkout">
     <h1 class="font-display text-4xl font-semibold">Checkout</h1>
-    <p class="mt-2 text-ink-600">Store pickup at 3 Kelly Street, Lansdowne, or local delivery. No account needed.</p>
+    <p class="mt-2 text-ink-600">Store pickup at 3 Kelly Street, Lansdowne, local delivery, or overnight shipping nationwide. No account needed.</p>
 
     {{-- Fulfilment method — a small GET reload so the total below always matches what's chosen --}}
     <form method="get" action="{{ route('checkout.create') }}" class="mt-6 flex flex-wrap items-end gap-4 rounded-3xl bg-white p-5 ring-1 ring-bone-200">
@@ -15,6 +15,11 @@
             <label class="flex items-center gap-2 text-sm font-semibold">
                 <input type="radio" name="fulfilment" value="delivery" class="accent-brand-700" onchange="this.form.requestSubmit()" @checked($fulfilmentMethod === 'delivery') /> Local delivery
             </label>
+            @if ($shippingReady)
+                <label class="flex items-center gap-2 text-sm font-semibold">
+                    <input type="radio" name="fulfilment" value="shipping" class="accent-brand-700" onchange="this.form.requestSubmit()" @checked($fulfilmentMethod === 'shipping') /> Ship nationwide (overnight)
+                </label>
+            @endif
         </div>
         @if ($fulfilmentMethod === 'delivery')
             <label class="text-sm font-semibold">
@@ -23,17 +28,34 @@
                        class="mt-1.5 block h-10 w-28 rounded-xl border border-bone-300 px-3 text-base focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-100" />
             </label>
             <button class="h-10 rounded-full bg-brand-800 px-5 text-sm font-bold text-white hover:bg-brand-700">Check</button>
+        @elseif ($fulfilmentMethod === 'shipping')
+            <label class="text-sm font-semibold">
+                State
+                <input name="ship_state" value="{{ $shipState }}" maxlength="2" placeholder="NY"
+                       class="mt-1.5 block h-10 w-20 rounded-xl border border-bone-300 px-3 text-base uppercase focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-100" />
+            </label>
+            <label class="text-sm font-semibold">
+                Zip code
+                <input name="ship_zip" value="{{ $shipZip }}" maxlength="5" inputmode="numeric" placeholder="10001"
+                       class="mt-1.5 block h-10 w-28 rounded-xl border border-bone-300 px-3 text-base focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-100" />
+            </label>
+            <button class="h-10 rounded-full bg-brand-800 px-5 text-sm font-bold text-white hover:bg-brand-700">Get shipping rate</button>
         @endif
         <input type="hidden" name="credit_email" value="{{ $creditEmail }}" />
     </form>
     @if ($zipError)
         <p class="mt-3 rounded-xl bg-brand-50 p-3 text-sm font-semibold text-brand-700">{{ $zipError }}</p>
     @endif
+    @if ($shipError)
+        <p class="mt-3 rounded-xl bg-brand-50 p-3 text-sm font-semibold text-brand-700">{{ $shipError }}</p>
+    @endif
 
     {{-- Store credit lookup (guideline ch. 7, S06) — a small GET reload, same pattern as the zip check --}}
     <form method="get" action="{{ route('checkout.create') }}" class="mt-3 flex flex-wrap items-end gap-3 rounded-3xl bg-white p-5 ring-1 ring-bone-200">
         <input type="hidden" name="fulfilment" value="{{ $fulfilmentMethod }}" />
         <input type="hidden" name="zip" value="{{ $zip }}" />
+        <input type="hidden" name="ship_state" value="{{ $shipState }}" />
+        <input type="hidden" name="ship_zip" value="{{ $shipZip }}" />
         <label class="text-sm font-semibold">
             Have store credit? Enter your email to check
             <input name="credit_email" type="email" value="{{ $creditEmail }}" placeholder="you@example.com"
@@ -45,7 +67,7 @@
         @endif
     </form>
 
-    @if ($fulfilmentMethod === 'pickup' || ($fulfilmentMethod === 'delivery' && $deliveryZone))
+    @if ($fulfilmentMethod === 'pickup' || ($fulfilmentMethod === 'delivery' && $deliveryZone) || ($fulfilmentMethod === 'shipping' && $shippingRateCents > 0))
     <div class="mt-6 grid items-start gap-8 lg:grid-cols-[1fr_380px]">
         <form method="post" action="{{ route('checkout.store') }}" id="checkout-form" class="space-y-5 rounded-3xl bg-white p-6 ring-1 ring-bone-200 sm:p-8">
             @csrf
@@ -61,9 +83,14 @@
                 </label>
             @endforeach
 
-            @if ($fulfilmentMethod === 'delivery')
-                <input type="hidden" name="delivery_zip" value="{{ $zip }}" />
-                <input type="hidden" name="delivery_state" value="PA" />
+            @if ($fulfilmentMethod === 'delivery' || $fulfilmentMethod === 'shipping')
+                @if ($fulfilmentMethod === 'delivery')
+                    <input type="hidden" name="delivery_zip" value="{{ $zip }}" />
+                    <input type="hidden" name="delivery_state" value="PA" />
+                @else
+                    <input type="hidden" name="delivery_zip" value="{{ $shipZip }}" />
+                    <input type="hidden" name="delivery_state" value="{{ $shipState }}" />
+                @endif
                 <label class="block text-sm font-semibold">
                     Street address
                     <input name="delivery_address_line1" value="{{ old('delivery_address_line1') }}" required
@@ -79,7 +106,9 @@
                     <input name="delivery_city" value="{{ old('delivery_city') }}" required
                            class="mt-1.5 block h-12 w-full rounded-xl border border-bone-300 bg-bone-50 px-3 text-base focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-100" />
                 </label>
+            @endif
 
+            @if ($fulfilmentMethod === 'delivery')
                 <fieldset>
                     <legend class="text-sm font-bold">Delivery window</legend>
                     <div class="mt-2 space-y-1.5">
@@ -131,6 +160,19 @@
                             <input type="radio" name="payment_method" value="cash" class="accent-brand-700" @checked(old('payment_method') === 'cash') /> Cash at pickup (orders under {{ $c::format($codMaxCents) }})
                         </label>
                     @endif
+                </div>
+            </fieldset>
+
+            @if ($fulfilmentMethod === 'shipping')
+                {{-- Owner decisions (guideline ch. 7, S08, recorded 2026-09-15): overnight only, full refund if it arrives warm. --}}
+                <p class="rounded-xl bg-bone-50 p-3 text-xs text-ink-600">
+                    Nationwide orders ship overnight only, frozen unless a product specifically ships chilled. If your order ever arrives warm, we'll issue a full refund — see our <a href="{{ route('legal.terms') }}" class="font-semibold text-brand-700 underline">shipping terms</a> for details.
+                </p>
+                <label class="flex items-start gap-3 text-sm">
+                    <input type="checkbox" name="agree_perishable_shipping" value="1" required class="mt-1 h-4 w-4 accent-brand-700" @checked(old('agree_perishable_shipping')) />
+                    <span>I've read the perishable shipping terms above.</span>
+                </label>
+            @endif
                 </div>
             </fieldset>
 
@@ -192,8 +234,8 @@
             @endif
             <dl class="mt-4 space-y-1.5 border-t border-bone-200 pt-4 text-sm">
                 <div class="flex justify-between"><dt class="text-ink-600">Items</dt><dd class="tabular-nums">{{ $c::format($quote['estimated_cents']) }}</dd></div>
-                <div class="flex justify-between"><dt class="text-ink-600">{{ $fulfilmentMethod === 'delivery' ? ($deliveryZone->name ?? 'Delivery') : 'Store pickup' }}</dt>
-                    <dd>{{ $deliveryFeeCents > 0 ? $c::format($deliveryFeeCents) : 'Free' }}</dd></div>
+                <div class="flex justify-between"><dt class="text-ink-600">{{ match($fulfilmentMethod) { 'delivery' => $deliveryZone->name ?? 'Delivery', 'shipping' => 'Overnight shipping', default => 'Store pickup' } }}</dt>
+                    <dd>{{ ($deliveryFeeCents + $shippingRateCents) > 0 ? $c::format($deliveryFeeCents + $shippingRateCents) : 'Free' }}</dd></div>
                 <div class="flex justify-between border-t border-bone-200 pt-1.5"><dt class="font-bold text-ink-900">Estimated total</dt><dd class="font-bold tabular-nums">{{ $c::format($totalEstimatedCents) }}</dd></div>
                 @if ($availableCreditCents > 0)
                     <div class="flex justify-between"><dt class="text-ink-600">Store credit</dt><dd id="summary-credit" aria-live="polite" class="tabular-nums">−{{ $c::format(0) }}</dd></div>

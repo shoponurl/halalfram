@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\CutStyle;
 use App\Enums\LotStatus;
 use App\Enums\NotificationEvent;
+use App\Enums\PackageTemperature;
 use App\Enums\Role;
 use App\Enums\Species;
 use App\Enums\StorageLocation;
@@ -18,6 +19,7 @@ use App\Models\Lot;
 use App\Models\NotificationTemplate;
 use App\Models\OffalOption;
 use App\Models\PackingOption;
+use App\Models\PackingRule;
 use App\Models\Product;
 use App\Models\ServiceZip;
 use App\Models\StoreCreditAccount;
@@ -25,6 +27,8 @@ use App\Models\User;
 use App\Payments\FakePaymentGateway;
 use App\Payments\PaymentGateway;
 use App\Payments\PayPalGateway;
+use App\Shipping\FakeShippingGateway;
+use App\Shipping\ShippingGateway;
 use App\Sms\FakeSmsGateway;
 use App\Sms\SmsGateway;
 use App\Support\Weight;
@@ -74,6 +78,15 @@ function fakeSms(): FakeSmsGateway
 {
     $fake = new FakeSmsGateway;
     app()->instance(SmsGateway::class, $fake);
+
+    return $fake;
+}
+
+/** Swaps the real EasyPost client for the in-memory fake and returns it. */
+function fakeShipping(): FakeShippingGateway
+{
+    $fake = new FakeShippingGateway;
+    app()->instance(ShippingGateway::class, $fake);
 
     return $fake;
 }
@@ -233,4 +246,23 @@ function deliverySlot(int $daysAhead = 1, int $capacity = 1): DeliverySlot
     $slot->save();
 
     return $slot;
+}
+
+/** An active packing rule covering a weight band, e.g. packingRule(maxWeightLb: '10.00'). */
+function packingRule(string $minWeightLb = '0.00', string $maxWeightLb = '20.00', PackageTemperature $temperature = PackageTemperature::Frozen): PackingRule
+{
+    $rule = new PackingRule;
+    $rule->name = 'Test rule '.Str::random(4);
+    $rule->temperature = $temperature;
+    $rule->min_weight_lb = Weight::pounds($minWeightLb);
+    $rule->max_weight_lb = Weight::pounds($maxWeightLb);
+    $rule->box_length_in = '12.00';
+    $rule->box_width_in = '10.00';
+    $rule->box_height_in = '8.00';
+    $rule->tare_weight_lb = Weight::pounds('3.000');
+    $rule->dry_ice_lb = Weight::pounds('5.000');
+    $rule->is_active = true;
+    $rule->save();
+
+    return $rule;
 }

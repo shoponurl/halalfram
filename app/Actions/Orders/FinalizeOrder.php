@@ -45,10 +45,10 @@ final class FinalizeOrder extends Action
                 throw ValidationException::withMessages(['order' => 'The card hold has expired — contact the customer to pay again.']);
             }
 
-            // The delivery fee and tax are fixed, order-level charges (guideline S05/S06) — they rode
-            // along in the estimate and hold, so they must ride along in the final total too, or they
-            // never get charged (the same regression class as the Sprint 02 option-surcharge bug).
-            $subtotal = (int) $locked->items->sum(fn ($item) => (int) $item->final_cents) + $locked->delivery_fee_cents + $locked->tax_cents;
+            // The delivery/shipping fee and tax are fixed, order-level charges (guideline S05/S06/S08)
+            // — they rode along in the estimate and hold, so they must ride along in the final total
+            // too, or they never get charged (the same regression class as the Sprint 02 option-surcharge bug).
+            $subtotal = (int) $locked->items->sum(fn ($item) => (int) $item->final_cents) + $locked->delivery_fee_cents + $locked->shipping_rate_cents + $locked->tax_cents;
 
             // Owner decision (guideline ch. 7, S06): a coupon discounts the final amount, not the
             // pre-weighing estimate — locked in here, against the real weighed total.

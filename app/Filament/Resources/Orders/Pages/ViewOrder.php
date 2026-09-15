@@ -14,6 +14,7 @@ use App\Actions\Orders\ApproveUnderweight;
 use App\Actions\Orders\FinalizeOrder;
 use App\Actions\Orders\RecordCashPayment;
 use App\Actions\Orders\RecordQcCheck;
+use App\Actions\Shipping\MarkArrivedWarm;
 use App\Enums\FulfilmentStatus;
 use App\Enums\OrderStatus;
 use App\Filament\Resources\Orders\OrderResource;
@@ -252,6 +253,22 @@ class ViewOrder extends ViewRecord
                     Notification::make()->success()->title('Rescheduled')->send();
                     $this->redirect(OrderResource::getUrl('view', ['record' => $record]));
                 }),
+
+            Action::make('markArrivedWarm')
+                ->label('Mark arrived warm — issue refund')
+                ->icon('heroicon-o-exclamation-triangle')
+                ->color('danger')
+                ->authorize(fn (Order $record) => auth()->user()?->can('manageFulfilment', $record) ?? false)
+                ->visible(fn (Order $record) => $record->fulfilment === 'shipping' && $record->fulfilment_status === FulfilmentStatus::Shipped)
+                ->requiresConfirmation()
+                ->modalDescription(fn (Order $record) => 'Owner decision (guideline S08): a cold-chain failure is always a full refund of '.Cents::format($record->final_cents).', never a resend.')
+                ->schema([
+                    Textarea::make('note')->label('What the customer reported')->required()->rows(2),
+                ])
+                ->action(fn (Order $record, array $data) => $this->runFulfilment(
+                    fn (User $user) => app(MarkArrivedWarm::class)->handle($record, (string) $data['note'], $user),
+                    'Marked arrived warm — full refund issued',
+                )),
         ];
     }
 

@@ -37,6 +37,7 @@ final class RefundFulfilment implements ShouldQueue
         public readonly int $orderId,
         public readonly int $amountCents,
         public readonly string $reason,
+        public readonly string $notificationEvent = NotificationEvent::Refunded->value,
     ) {}
 
     public function handle(PaymentGatewayFactory $gateways): void
@@ -87,7 +88,7 @@ final class RefundFulfilment implements ShouldQueue
         });
 
         if ($notify) {
-            DispatchOrderNotification::dispatch($this->orderId, NotificationEvent::Refunded->value);
+            DispatchOrderNotification::dispatch($this->orderId, $this->notificationEvent);
         }
     }
 

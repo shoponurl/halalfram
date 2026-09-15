@@ -16,6 +16,10 @@
             <p>Store pickup is at 3 Kelly Street, Lansdowne, PA. Local delivery is offered only to the zip codes listed at checkout. A missed pickup or a failed delivery is handled per the policy shown on your order page.</p>
         </section>
         <section>
+            <h2 class="font-display text-xl font-semibold text-ink-900">Nationwide shipping</h2>
+            <p>We ship nationwide by overnight carrier only — perishable food can't safely ride a slower service. Orders ship frozen unless a specific product is labeled as shipping chilled, and only on days that guarantee next-day arrival before a weekend (never Friday through Sunday). If your order ever arrives warm, tell us and we'll issue a full refund — we don't offer a resend, since a second shipment carries the same risk. Shipping is available only within the United States.</p>
+        </section>
+        <section>
             <h2 class="font-display text-xl font-semibold text-ink-900">Payment</h2>
             <p>We accept card, PayPal, and — for pickup orders under {{ \App\Support\Cents::format((int) config('catchweight.cod_max_order_cents')) }} — cash at pickup. Card and PayPal payments are processed by Stripe and PayPal directly; we never see or store your full card number.</p>
         </section>

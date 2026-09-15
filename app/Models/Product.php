@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Storage;
  * @property int $price_per_lb_cents
  * @property Weight $estimated_weight_lb
  * @property string|null $tolerance_pct
+ * @property bool $requires_chilled_shipping
  * @property bool $is_active
  * @property-read Category|null $category
  */
@@ -46,6 +47,7 @@ class Product extends Model
         'price_per_lb_cents',
         'estimated_weight_lb',
         'tolerance_pct',
+        'requires_chilled_shipping',
         'is_active',
     ];
 
@@ -58,6 +60,7 @@ class Product extends Model
             'price_per_lb_cents' => 'integer',
             'estimated_weight_lb' => WeightCast::class,
             'tolerance_pct' => 'decimal:2',
+            'requires_chilled_shipping' => 'boolean',
             'is_active' => 'boolean',
         ];
     }

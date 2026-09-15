@@ -78,4 +78,24 @@ return [
     // Real USDA establishment number, once assigned — left null until the owner adds it (never
     // fabricated). Optional: shown in the checkout notice and footer only when present.
     'usda_establishment_number' => env('USDA_ESTABLISHMENT_NUMBER'),
+
+    // Owner decisions (guideline ch. 7, S08, recorded 2026-09-15): interstate shipping is confirmed
+    // permitted. Overnight only to start — the safest choice for a perishable shipment; frozen by
+    // default (holds up far better in transit) except where a product specifically needs chilled; a
+    // cold-chain failure (arrived warm) is always a full refund, never a resend or partial credit.
+    'shipping_service_level' => 'overnight',
+    'default_package_temperature' => 'frozen',
+
+    // Ship days: Monday-Thursday only, so an overnight shipment never arrives on a weekend with no one
+    // to receive it. Federal holidays and other blackout dates live in App\Models\ShipBlackoutDate.
+    'ship_weekdays' => [1, 2, 3, 4],
+
+    // The shop's own address, as the "from" side of every EasyPost shipment.
+    'shop_address' => [
+        'name' => 'Halal Brothers Live Poultry & Meat',
+        'address1' => '3 Kelly Street',
+        'city' => 'Lansdowne',
+        'state' => 'PA',
+        'zip' => '19050',
+    ],
 ];

@@ -10,6 +10,8 @@ use App\Actions\Inventory\ReleaseStock;
 use App\Actions\Inventory\ReserveStock;
 use App\Actions\Payments\RedeemStoreCredit;
 use App\Actions\Production\ScheduleOrder;
+use App\Actions\Shipping\ComputeShipDate;
+use App\Actions\Shipping\PriceShipment;
 use App\Enums\FulfilmentStatus;
 use App\Enums\NotificationEvent;
 use App\Enums\OrderStatus;
@@ -45,13 +47,15 @@ final class PlaceOrder extends Action
         private readonly ReserveDeliverySlot $reserveDeliverySlot,
         private readonly RedeemStoreCredit $redeemStoreCredit,
         private readonly TaxCalculator $tax,
+        private readonly PriceShipment $priceShipment,
+        private readonly ComputeShipDate $computeShipDate,
     ) {}
 
     /**
      * @param  array<int|string, int|array<string, int|null>>  $lines  raw cart lines, straight from the session
      * @param  array{customer_name: string, customer_email: string, customer_phone: string, notes?: string|null, marketing_sms_opt_in?: bool, marketing_email_opt_in?: bool}  $customer
-     * @param  int  $expectedHoldCents  the hold the customer saw (including delivery fee, tax and any store credit); any difference means prices changed or were tampered with
-     * @param  array{method?: string, address_line1?: string, address_line2?: string|null, city?: string, state?: string, zip?: string, delivery_slot_id?: int}  $fulfilment  defaults to store pickup
+     * @param  int  $expectedHoldCents  the hold the customer saw (including delivery/shipping fee, tax and any store credit); any difference means prices changed or were tampered with
+     * @param  array{method?: string, address_line1?: string, address_line2?: string|null, city?: string, state?: string, zip?: string, delivery_slot_id?: int}  $fulfilment  method: pickup | delivery | shipping (guideline ch. 7, S08 — nationwide, overnight only); defaults to store pickup
      * @param  string  $paymentMethod  card | paypal | cash — cash is pickup-only, capped at config('catchweight.cod_max_order_cents') (owner decision, guideline ch. 7, S06)
      * @param  bool  $regulatoryConsent  the USDA/PA disclosure was shown and accepted (guideline ch. 7, S07). Defaults true for internal callers (phone/counter orders, tests) that already disclosed it outside the web checkout form; CheckoutRequest requires the real checkbox before the web path ever reaches here.
      * @return array{order: Order, token: string}
@@ -77,7 +81,8 @@ final class PlaceOrder extends Action
             $quote = $this->quote->handle($lines, lockProducts: true);
 
             $isDelivery = ($fulfilment['method'] ?? 'pickup') === 'delivery';
-            if ($paymentMethod === 'cash' && $isDelivery) {
+            $isShipping = ($fulfilment['method'] ?? 'pickup') === 'shipping';
+            if ($paymentMethod === 'cash' && ($isDelivery || $isShipping)) {
                 throw ValidationException::withMessages(['payment_method' => 'Cash is only available for store pickup.']);
             }
 
@@ -90,9 +95,25 @@ final class PlaceOrder extends Action
             }
             $deliveryFeeCents = $deliveryZone->flat_fee_cents ?? 0;
 
-            $taxCents = $this->tax->calculate($quote['estimated_cents'] + $deliveryFeeCents);
-            $totalEstimatedCents = $quote['estimated_cents'] + $deliveryFeeCents + $taxCents;
-            $preCreditHoldCents = $quote['hold_cents'] + $deliveryFeeCents + $taxCents;
+            // Owner decisions (guideline ch. 7, S08): overnight only, frozen unless a product needs
+            // chilled, priced by a database-driven packing rule matched to the order's weight.
+            $shipment = null;
+            $shippingRateCents = 0;
+            if ($isShipping) {
+                $shipment = $this->priceShipment->handle($quote['lines'], [
+                    'name' => (string) ($customer['customer_name'] ?? ''),
+                    'address1' => (string) ($fulfilment['address_line1'] ?? ''),
+                    'address2' => $fulfilment['address_line2'] ?? null,
+                    'city' => (string) ($fulfilment['city'] ?? ''),
+                    'state' => (string) ($fulfilment['state'] ?? ''),
+                    'zip' => (string) ($fulfilment['zip'] ?? ''),
+                ]);
+                $shippingRateCents = $shipment['rate_cents'];
+            }
+
+            $taxCents = $this->tax->calculate($quote['estimated_cents'] + $deliveryFeeCents + $shippingRateCents);
+            $totalEstimatedCents = $quote['estimated_cents'] + $deliveryFeeCents + $shippingRateCents + $taxCents;
+            $preCreditHoldCents = $quote['hold_cents'] + $deliveryFeeCents + $shippingRateCents + $taxCents;
 
             $email = strtolower(trim((string) $customer['customer_email']));
             $minimumChargeCents = (int) config('catchweight.minimum_charge_cents');
@@ -145,27 +166,35 @@ final class PlaceOrder extends Action
             $order->user_id = $user?->id;
             $order->payment_method = $paymentMethod;
             $order->status = $paymentMethod === 'cash' ? OrderStatus::Authorized : OrderStatus::PendingPayment;
-            $order->fulfilment = $isDelivery ? 'delivery' : 'pickup';
+            $order->fulfilment = $isDelivery ? 'delivery' : ($isShipping ? 'shipping' : 'pickup');
             $order->fulfilment_status = FulfilmentStatus::AwaitingFulfilment;
             $order->lead_time_days = $quote['lead_time_days'];
             $order->scheduled_date = $scheduledDate;
             $order->estimated_cents = $totalEstimatedCents;
             $order->hold_cents = $totalHoldCents;
             $order->currency = (string) config('catchweight.currency');
-            $order->delivery_fee_cents = $deliveryFeeCents;   // 0 for pickup — set unconditionally so it's never left null in-memory
+            $order->delivery_fee_cents = $deliveryFeeCents;   // 0 for pickup/shipping — set unconditionally so it's never left null in-memory
+            $order->shipping_rate_cents = $shippingRateCents;   // 0 for pickup/delivery
             $order->tax_cents = $taxCents;
             $order->coupon_id = $coupon?->id;
             $order->store_credit_applied_cents = $creditAppliedCents;
             $order->regulatory_consent_at = $regulatoryConsent ? now() : null;
             $order->regulatory_consent_version = $regulatoryConsent ? (string) config('catchweight.regulatory_notice_version') : null;
-            if ($isDelivery) {
-                $order->delivery_zone_id = $deliveryZone?->id;
-                $order->delivery_slot_id = $deliverySlot?->id;
+            if ($isDelivery || $isShipping) {
                 $order->delivery_address_line1 = (string) ($fulfilment['address_line1'] ?? '');
                 $order->delivery_address_line2 = $fulfilment['address_line2'] ?? null;
                 $order->delivery_city = (string) ($fulfilment['city'] ?? '');
-                $order->delivery_state = (string) ($fulfilment['state'] ?? 'PA');
+                $order->delivery_state = (string) ($fulfilment['state'] ?? ($isShipping ? '' : 'PA'));
                 $order->delivery_zip = (string) ($fulfilment['zip'] ?? '');
+            }
+            if ($isDelivery) {
+                $order->delivery_zone_id = $deliveryZone?->id;
+                $order->delivery_slot_id = $deliverySlot?->id;
+            }
+            if ($isShipping && $shipment !== null) {
+                $order->package_temperature = $shipment['temperature'];
+                $order->packing_rule_id = $shipment['packing_rule']->id;
+                $order->scheduled_ship_date = $this->computeShipDate->handle();
             }
             if ($paymentMethod === 'cash') {
                 $order->authorized_at = now();

@@ -21,6 +21,8 @@ enum NotificationEvent: string
     case BalanceDue = 'order.balance_due';
     case Refunded = 'order.refunded';
     case Completed = 'order.completed';
+    case Shipped = 'order.shipped';
+    case ArrivedWarm = 'order.arrived_warm';
 
     public function label(): string
     {
@@ -35,6 +37,8 @@ enum NotificationEvent: string
             self::BalanceDue => 'Balance due',
             self::Refunded => 'Refunded',
             self::Completed => 'Order completed',
+            self::Shipped => 'Shipped',
+            self::ArrivedWarm => 'Arrived warm — refund issued',
         };
     }
 }

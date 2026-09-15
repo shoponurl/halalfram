@@ -193,6 +193,11 @@ final class SettleOrderPayment implements ShouldQueue
         $order->save();
 
         DispatchOrderNotification::dispatch($order->id, NotificationEvent::Completed->value);
+
+        // Guideline ch. 6, S08: only buy the label once the customer is actually charged, never before.
+        if ($order->fulfilment === 'shipping') {
+            PurchaseShippingLabel::dispatch($order->id);
+        }
     }
 
     private function succeeded(Order $order, string $key): bool

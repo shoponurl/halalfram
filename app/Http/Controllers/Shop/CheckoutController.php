@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Shop;
 use App\Actions\Delivery\ReserveDeliverySlot;
 use App\Actions\Orders\PlaceOrder;
 use App\Actions\Orders\QuoteCart;
+use App\Actions\Shipping\PriceShipment;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Shop\Concerns\AuthorizesOrderAccess;
@@ -15,6 +16,7 @@ use App\Models\DeliverySlot;
 use App\Models\Order;
 use App\Models\StoreCreditAccount;
 use App\Payments\PaymentGatewayFactory;
+use App\Shipping\ShippingGateway;
 use App\Support\Cart;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,13 +27,14 @@ final class CheckoutController extends Controller
 {
     use AuthorizesOrderAccess;
 
-    public function create(Request $request, Cart $cart, QuoteCart $quote, PaymentGatewayFactory $gateways, ReserveDeliverySlot $reserveDeliverySlot): View|RedirectResponse
+    public function create(Request $request, Cart $cart, QuoteCart $quote, PaymentGatewayFactory $gateways, ReserveDeliverySlot $reserveDeliverySlot, PriceShipment $priceShipment, ShippingGateway $shippingGateway): View|RedirectResponse
     {
         if ($cart->lines() === []) {
             return redirect()->route('cart.show');
         }
 
-        $method = $request->query('fulfilment') === 'delivery' ? 'delivery' : 'pickup';
+        $fulfilmentQuery = (string) $request->query('fulfilment');
+        $method = in_array($fulfilmentQuery, ['delivery', 'shipping'], true) ? $fulfilmentQuery : 'pickup';
         $zip = trim((string) $request->query('zip', ''));
 
         $deliveryZone = null;
@@ -48,6 +51,21 @@ final class CheckoutController extends Controller
             }
         }
 
+        $shipState = mb_strtoupper(trim((string) $request->query('ship_state', '')));
+        $shipZip = trim((string) $request->query('ship_zip', ''));
+        $shipCents = 0;
+        $shipError = null;
+        if ($method === 'shipping' && $shipState !== '' && $shipZip !== '') {
+            try {
+                $shipment = $priceShipment->handle($quote->handle($cart->lines())['lines'], [
+                    'name' => 'Customer', 'address1' => '', 'city' => '', 'state' => $shipState, 'zip' => $shipZip,
+                ]);
+                $shipCents = $shipment['rate_cents'];
+            } catch (ValidationException $e) {
+                $shipError = collect($e->errors())->flatten()->first();
+            }
+        }
+
         $creditEmail = strtolower(trim((string) $request->query('credit_email', '')));
         $availableCreditCents = $creditEmail !== '' ? (StoreCreditAccount::query()->find($creditEmail)->balance_cents ?? 0) : 0;
 
@@ -55,6 +73,7 @@ final class CheckoutController extends Controller
             'quote' => $quote->handle($cart->lines()),
             'cardReady' => $gateways->for('card')?->isConfigured() ?? false,
             'paypalReady' => $gateways->for('paypal')?->isConfigured() ?? false,
+            'shippingReady' => $shippingGateway->isConfigured(),
             'codMaxCents' => (int) config('catchweight.cod_max_order_cents'),
             'policy' => config('catchweight'),
             'fulfilmentMethod' => $method,
@@ -63,6 +82,10 @@ final class CheckoutController extends Controller
             'zipError' => $zipError,
             'slots' => $slots,
             'deliveryFeeCents' => $deliveryZone->flat_fee_cents ?? 0,
+            'shipState' => $shipState,
+            'shipZip' => $shipZip,
+            'shippingRateCents' => $shipCents,
+            'shipError' => $shipError,
             'creditEmail' => $creditEmail,
             'availableCreditCents' => $availableCreditCents,
             'usdaEstablishmentNumber' => config('catchweight.usda_establishment_number'),
@@ -73,6 +96,7 @@ final class CheckoutController extends Controller
     {
         $data = $request->validated();
         $isDelivery = $data['fulfilment_method'] === 'delivery';
+        $isShipping = $data['fulfilment_method'] === 'shipping';
 
         $result = $placeOrder->handle(
             lines: $cart->lines(),
@@ -85,15 +109,26 @@ final class CheckoutController extends Controller
                 'marketing_email_opt_in' => (bool) ($data['marketing_email_opt_in'] ?? false),
             ],
             expectedHoldCents: (int) $data['expected_hold_cents'],
-            fulfilment: $isDelivery ? [
-                'method' => 'delivery',
-                'address_line1' => (string) $data['delivery_address_line1'],
-                'address_line2' => $data['delivery_address_line2'] ?? null,
-                'city' => (string) $data['delivery_city'],
-                'state' => strtoupper((string) $data['delivery_state']),
-                'zip' => (string) $data['delivery_zip'],
-                'delivery_slot_id' => (int) $data['delivery_slot_id'],
-            ] : ['method' => 'pickup'],
+            fulfilment: match (true) {
+                $isDelivery => [
+                    'method' => 'delivery',
+                    'address_line1' => (string) $data['delivery_address_line1'],
+                    'address_line2' => $data['delivery_address_line2'] ?? null,
+                    'city' => (string) $data['delivery_city'],
+                    'state' => strtoupper((string) $data['delivery_state']),
+                    'zip' => (string) $data['delivery_zip'],
+                    'delivery_slot_id' => (int) $data['delivery_slot_id'],
+                ],
+                $isShipping => [
+                    'method' => 'shipping',
+                    'address_line1' => (string) $data['delivery_address_line1'],
+                    'address_line2' => $data['delivery_address_line2'] ?? null,
+                    'city' => (string) $data['delivery_city'],
+                    'state' => strtoupper((string) $data['delivery_state']),
+                    'zip' => (string) $data['delivery_zip'],
+                ],
+                default => ['method' => 'pickup'],
+            },
             user: $request->user(),
             paymentMethod: (string) $data['payment_method'],
             couponCode: $data['coupon_code'] ?? null,

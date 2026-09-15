@@ -86,6 +86,12 @@ $complianceOnlyRoutes = [
 $phoneOrderRoutes = [
     'phone-order' => fn () => '/admin/phone-order',
 ];
+$shippingConfigRoutes = [
+    'packing-rules.list' => fn () => '/admin/packing-rules',
+    'packing-rules.create' => fn () => '/admin/packing-rules/create',
+    'ship-blackout-dates.list' => fn () => '/admin/ship-blackout-dates',
+    'ship-blackout-dates.create' => fn () => '/admin/ship-blackout-dates/create',
+];
 
 // Only Owner, Manager, Front desk, Butcher and Accountant have orders.view (App\Enums\Role::permissions())
 $canViewOrders = [Role::Owner, Role::Manager, Role::FrontDesk, Role::Butcher, Role::Accountant];
@@ -205,6 +211,16 @@ $canManageOrders = [Role::Owner, Role::Manager, Role::FrontDesk];
 foreach (Role::cases() as $role) {
     $expected = in_array($role, $canManageOrders, true) ? 200 : 403;
     foreach ($phoneOrderRoutes as $name => $url) {
+        it("returns {$expected} for {$role->label()} on {$name}", function () use ($role, $url, $expected) {
+            $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
+        });
+    }
+}
+
+// Only Owner and Manager have catalog.manage — packing rules and ship blackout dates, guideline S08
+foreach (Role::cases() as $role) {
+    $expected = in_array($role, $canManageCatalog, true) ? 200 : 403;
+    foreach ($shippingConfigRoutes as $name => $url) {
         it("returns {$expected} for {$role->label()} on {$name}", function () use ($role, $url, $expected) {
             $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
         });

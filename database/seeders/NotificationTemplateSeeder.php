@@ -53,6 +53,12 @@ class NotificationTemplateSeeder extends Seeder
             ['event' => NotificationEvent::Refunded, 'channel' => 'email', 'subject' => 'Refund issued for order {{order_number}}', 'body' => "Hi {{customer_name}},\n\nA refund of {{refund_amount}} was issued for order {{order_number}}. It should appear on your statement in a few business days.\n\nDetails: {{tracking_url}}"],
 
             ['event' => NotificationEvent::Completed, 'channel' => 'email', 'subject' => 'Order {{order_number}} complete — thank you!', 'body' => "Hi {{customer_name}},\n\nOrder {{order_number}} is complete. Thanks for shopping with Halal Brothers!\n\nReceipt: {{tracking_url}}"],
+
+            ['event' => NotificationEvent::Shipped, 'channel' => 'sms', 'body' => 'Halal Brothers: order {{order_number}} shipped via {{carrier}}, tracking {{carrier_tracking_number}}: {{carrier_tracking_url}}'],
+            ['event' => NotificationEvent::Shipped, 'channel' => 'email', 'subject' => 'Order {{order_number}} has shipped', 'body' => "Hi {{customer_name}},\n\nYour order {{order_number}} has shipped via {{carrier}}, overnight. Tracking number: {{carrier_tracking_number}}\n\nTrack it: {{carrier_tracking_url}}"],
+
+            ['event' => NotificationEvent::ArrivedWarm, 'channel' => 'sms', 'body' => "Halal Brothers: we're sorry order {{order_number}} arrived warm. A full refund of {{refund_amount}} is on its way."],
+            ['event' => NotificationEvent::ArrivedWarm, 'channel' => 'email', 'subject' => "We're sorry — order {{order_number}} arrived warm", 'body' => "Hi {{customer_name}},\n\nWe're very sorry to hear order {{order_number}} arrived warm. A full refund of {{refund_amount}} has been issued.\n\nDetails: {{tracking_url}}"],
         ];
     }
 }

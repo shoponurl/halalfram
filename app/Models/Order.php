@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\FulfilmentStatus;
 use App\Enums\OrderStatus;
+use App\Enums\PackageTemperature;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -50,6 +51,18 @@ use Illuminate\Support\Str;
  * @property int $delivery_fee_cents
  * @property int $delivery_attempts
  * @property string|null $delivery_otp
+ * @property int $shipping_rate_cents
+ * @property int|null $shipping_actual_rate_cents
+ * @property string|null $shipping_carrier
+ * @property string|null $shipping_service
+ * @property PackageTemperature|null $package_temperature
+ * @property int|null $packing_rule_id
+ * @property Carbon|null $scheduled_ship_date
+ * @property string|null $easypost_shipment_id
+ * @property string|null $tracking_number
+ * @property string|null $tracking_url
+ * @property string|null $shipping_label_url
+ * @property Carbon|null $shipped_at
  * @property Carbon|null $ready_notified_at
  * @property Carbon|null $pickup_reminder_sent_at
  * @property int $refunded_cents
@@ -87,6 +100,7 @@ use Illuminate\Support\Str;
  * @property-read Collection<int, DeliveryEvent> $deliveryEvents
  * @property-read DeliveryZone|null $deliveryZone
  * @property-read DeliverySlot|null $deliverySlot
+ * @property-read PackingRule|null $packingRule
  * @property-read User|null $driver
  * @property-read Invoice|null $invoice
  * @property-read Coupon|null $coupon
@@ -122,6 +136,11 @@ class Order extends Model
             'store_credit_applied_cents' => 'integer',
             'delivery_fee_cents' => 'integer',
             'delivery_attempts' => 'integer',
+            'shipping_rate_cents' => 'integer',
+            'shipping_actual_rate_cents' => 'integer',
+            'package_temperature' => PackageTemperature::class,
+            'scheduled_ship_date' => 'date',
+            'shipped_at' => 'datetime',
             'ready_notified_at' => 'datetime',
             'pickup_reminder_sent_at' => 'datetime',
             'refunded_cents' => 'integer',
@@ -191,6 +210,12 @@ class Order extends Model
     public function deliverySlot(): BelongsTo
     {
         return $this->belongsTo(DeliverySlot::class, 'delivery_slot_id');
+    }
+
+    /** @return BelongsTo<PackingRule, $this> */
+    public function packingRule(): BelongsTo
+    {
+        return $this->belongsTo(PackingRule::class);
     }
 
     /** @return BelongsTo<User, $this> */

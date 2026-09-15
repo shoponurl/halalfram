@@ -7,6 +7,7 @@ namespace App\Actions\Orders;
 use App\Actions\Action;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentTransactionType;
+use App\Jobs\PurchaseShippingLabel;
 use App\Models\Order;
 use App\Models\PaymentTransaction;
 use Illuminate\Support\Facades\Log;
@@ -16,7 +17,7 @@ final class MarkBalancePaid extends Action
 {
     public function handle(Order $order, string $checkoutSessionId, int $amountPaidCents): bool
     {
-        return $this->transaction(function () use ($order, $checkoutSessionId, $amountPaidCents): bool {
+        $completed = $this->transaction(function () use ($order, $checkoutSessionId, $amountPaidCents): bool {
             /** @var Order $locked */
             $locked = Order::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
             if ($locked->status !== OrderStatus::AwaitingBalance) {
@@ -46,5 +47,11 @@ final class MarkBalancePaid extends Action
 
             return true;
         });
+
+        if ($completed && $order->fulfilment === 'shipping') {
+            PurchaseShippingLabel::dispatch($order->id);
+        }
+
+        return $completed;
     }
 }

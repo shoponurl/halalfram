@@ -16,6 +16,8 @@ enum DeliveryEventType: string
     case DeliveryFailed = 'delivery_failed';
     case Rescheduled = 'rescheduled';
     case Refunded = 'refunded';
+    case Shipped = 'shipped';
+    case ArrivedWarm = 'arrived_warm';
 
     public function label(): string
     {
@@ -29,6 +31,8 @@ enum DeliveryEventType: string
             self::DeliveryFailed => 'Delivery attempt failed',
             self::Rescheduled => 'Rescheduled',
             self::Refunded => 'Refund issued',
+            self::Shipped => 'Shipped',
+            self::ArrivedWarm => 'Reported arrived warm — cold-chain failure',
         };
     }
 }

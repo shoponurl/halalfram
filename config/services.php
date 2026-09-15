@@ -53,6 +53,13 @@ return [
         'from' => env('TWILIO_FROM_NUMBER'),
     ],
 
+    // Guideline ch. 6, Sprint 08. Called directly (App\Shipping\EasyPostGateway) — no SDK, same
+    // rationale as Sprint 06's hand-built PayPalGateway: a plain JSON REST API, kept symmetric.
+    'easypost' => [
+        'api_key' => env('EASYPOST_API_KEY'),
+        'webhook_secret' => env('EASYPOST_WEBHOOK_SECRET'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

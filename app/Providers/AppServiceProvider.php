@@ -11,6 +11,8 @@ use App\Payments\PaymentGateway;
 use App\Payments\PayPalGateway;
 use App\Payments\StripeGateway;
 use App\Payments\TaxCalculator;
+use App\Shipping\EasyPostGateway;
+use App\Shipping\ShippingGateway;
 use App\Sms\SmsGateway;
 use App\Sms\TwilioSmsGateway;
 use Illuminate\Auth\Events\Login;
@@ -49,6 +51,16 @@ class AppServiceProvider extends ServiceProvider
             authToken: config('services.twilio.token'),
             messagingServiceSid: config('services.twilio.messaging_service_sid'),
             fromNumber: config('services.twilio.from'),
+        ));
+
+        $this->app->singleton(ShippingGateway::class, fn () => new EasyPostGateway(
+            apiKey: config('services.easypost.api_key'),
+            webhookSecret: config('services.easypost.webhook_secret'),
+            fromName: (string) config('catchweight.shop_address.name'),
+            fromAddress1: (string) config('catchweight.shop_address.address1'),
+            fromCity: (string) config('catchweight.shop_address.city'),
+            fromState: (string) config('catchweight.shop_address.state'),
+            fromZip: (string) config('catchweight.shop_address.zip'),
         ));
     }
 
