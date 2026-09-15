@@ -20,9 +20,6 @@ use Illuminate\Validation\ValidationException;
  */
 final class ScheduleOrder extends Action
 {
-    /** @var list<OrderStatus> statuses that no longer hold a place in the day's capacity */
-    private const RELEASED_STATUSES = [OrderStatus::PaymentFailed, OrderStatus::AuthorizationExpired, OrderStatus::Cancelled];
-
     public function handle(int $neededMinutes): Carbon
     {
         $date = $this->firstCandidateDate();
@@ -39,7 +36,7 @@ final class ScheduleOrder extends Action
                 }
 
                 $used = (int) OrderItem::query()
-                    ->whereHas('order', fn ($q) => $q->whereDate('scheduled_date', $date->toDateString())->whereNotIn('status', self::RELEASED_STATUSES))
+                    ->whereHas('order', fn ($q) => $q->whereDate('scheduled_date', $date->toDateString())->whereNotIn('status', OrderStatus::abandoned()))
                     ->sum('estimated_minutes');
 
                 return ($used + $neededMinutes) <= $locked->capacityMinutes();

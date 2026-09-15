@@ -47,4 +47,21 @@ return [
 
     // A scheduled order can never be pushed further out than the card hold stays valid — no
     // re-authorization flow (same call as the Sprint 02 lead-time cap). Reuses authorization_fallback_days.
+
+    // Owner decisions (guideline ch. 7, S05, recorded 2026-09-15):
+    // Longest a delivered order should sit outside refrigeration (FDA/USDA "danger zone" rule) —
+    // caps how long a delivery slot's own time-window may run.
+    'cold_chain_max_hours' => 2,
+
+    // Missed delivery: return to store, one free re-attempt, then refund the actual total minus the
+    // delivery fee (the fee covers the driver's real trip cost either way).
+    'delivery_max_attempts' => 2,
+
+    // Missed pickup: one reminder at this many hours after "ready", written off (partial refund) at
+    // this many hours if still uncollected — approximating "a reminder, then by end of next business day".
+    'pickup_reminder_hours' => 24,
+    'pickup_writeoff_hours' => 48,
+
+    // The customer's share of a written-off missed pickup; the rest covers the wasted product.
+    'pickup_writeoff_refund_pct' => 80,
 ];

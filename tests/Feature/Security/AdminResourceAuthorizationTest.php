@@ -56,6 +56,15 @@ $productionDayRoutes = [
 $productionBoardRoutes = [
     'production-board' => fn () => '/admin/production-board',
 ];
+$deliveryConfigRoutes = [
+    'delivery-zones.list' => fn () => '/admin/delivery-zones',
+    'delivery-zones.create' => fn () => '/admin/delivery-zones/create',
+    'delivery-slots.list' => fn () => '/admin/delivery-slots',
+    'delivery-slots.create' => fn () => '/admin/delivery-slots/create',
+];
+$driverRouteRoutes = [
+    'driver-route' => fn () => '/admin/driver-route',
+];
 
 // Only Owner, Manager, Front desk, Butcher and Accountant have orders.view (App\Enums\Role::permissions())
 $canViewOrders = [Role::Owner, Role::Manager, Role::FrontDesk, Role::Butcher, Role::Accountant];
@@ -110,6 +119,27 @@ $canRecordWeights = [Role::Owner, Role::Manager, Role::Butcher];
 foreach (Role::cases() as $role) {
     $expected = in_array($role, $canRecordWeights, true) ? 200 : 403;
     foreach ($productionBoardRoutes as $name => $url) {
+        it("returns {$expected} for {$role->label()} on {$name}", function () use ($role, $url, $expected) {
+            $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
+        });
+    }
+}
+
+// Only Owner and Manager have catalog.manage — the service area/fees/slots are a manager-level setting
+foreach (Role::cases() as $role) {
+    $expected = in_array($role, $canManageCatalog, true) ? 200 : 403;
+    foreach ($deliveryConfigRoutes as $name => $url) {
+        it("returns {$expected} for {$role->label()} on {$name}", function () use ($role, $url, $expected) {
+            $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
+        });
+    }
+}
+
+// Only Owner, Manager and Driver have deliveries.manage (App\Enums\Role::permissions())
+$canManageDeliveries = [Role::Owner, Role::Manager, Role::Driver];
+foreach (Role::cases() as $role) {
+    $expected = in_array($role, $canManageDeliveries, true) ? 200 : 403;
+    foreach ($driverRouteRoutes as $name => $url) {
         it("returns {$expected} for {$role->label()} on {$name}", function () use ($role, $url, $expected) {
             $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
         });

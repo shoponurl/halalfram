@@ -7,6 +7,7 @@ namespace App\Payments;
 use App\Payments\Data\ChargeResult;
 use App\Payments\Data\HostedPaymentLink;
 use App\Payments\Data\IntentState;
+use App\Payments\Data\RefundResult;
 use App\Payments\Data\WebhookEvent;
 use App\Payments\Exceptions\InvalidWebhookSignature;
 use Carbon\CarbonImmutable;
@@ -32,6 +33,8 @@ final class FakePaymentGateway implements PaymentGateway
     public bool $declineOffSession = false;
 
     public bool $declineHold = false;
+
+    public bool $declineRefund = false;
 
     private int $sequence = 0;
 
@@ -119,6 +122,19 @@ final class FakePaymentGateway implements PaymentGateway
             $id = 'cs_fake_'.(++$this->sequence);
 
             return new HostedPaymentLink($id, "https://checkout.stripe.test/{$id}");
+        });
+    }
+
+    public function refund(string $intentId, int $amountCents, string $idempotencyKey): RefundResult
+    {
+        return $this->once($idempotencyKey, function () use ($intentId, $amountCents, $idempotencyKey) {
+            $this->intent($intentId);   // must exist, same as Stripe would require
+            if ($this->declineRefund) {
+                return new RefundResult(false, null, 'Refund could not be processed.');
+            }
+            $this->calls[] = ['operation' => 'refund', 'key' => $idempotencyKey, 'amount' => $amountCents];
+
+            return new RefundResult(true, 're_fake_'.(++$this->sequence));
         });
     }
 

@@ -19,6 +19,7 @@ beforeEach(function () {
         'customer_phone' => '267-555-0123',
         'agree_catch_weight' => '1',
         'expected_hold_cents' => 1100,
+        'fulfilment_method' => 'pickup',
     ];
 });
 
@@ -37,9 +38,17 @@ it('rejects a request that tries to smuggle a price field into checkout', functi
     expect(Order::query()->count())->toBe(0);
 });
 
+it('rejects a request that tries to smuggle a delivery fee into checkout', function () {
+    withCartLine($this)
+        ->post('/checkout', $this->validPayload + ['delivery_fee_cents' => 1])
+        ->assertSessionHasErrors('delivery_fee_cents');
+
+    expect(Order::query()->count())->toBe(0);
+});
+
 it('rejects checkout when the posted hold no longer matches the server price', function () {
     withCartLine($this)
-        ->post('/checkout', ['customer_name' => 'Test Buyer', 'customer_email' => 'buyer@example.com', 'customer_phone' => '267-555-0123', 'agree_catch_weight' => '1', 'expected_hold_cents' => 1])
+        ->post('/checkout', ['customer_name' => 'Test Buyer', 'customer_email' => 'buyer@example.com', 'customer_phone' => '267-555-0123', 'agree_catch_weight' => '1', 'expected_hold_cents' => 1, 'fulfilment_method' => 'pickup'])
         ->assertSessionHasErrors('cart');
 
     expect(Order::query()->count())->toBe(0);

@@ -61,4 +61,14 @@ enum OrderStatus: string
     {
         return in_array($this, [self::Authorized, self::QcFailed], true);
     }
+
+    /**
+     * An order that will never be fulfilled no longer holds a place in any capacity/slot count.
+     *
+     * @return list<self>
+     */
+    public static function abandoned(): array
+    {
+        return [self::PaymentFailed, self::AuthorizationExpired, self::Cancelled];
+    }
 }

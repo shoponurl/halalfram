@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\FulfilmentStatus;
 use App\Enums\OrderStatus;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -27,6 +28,21 @@ use Illuminate\Support\Carbon;
  * @property string $customer_email
  * @property string $customer_phone
  * @property string $fulfilment
+ * @property FulfilmentStatus $fulfilment_status
+ * @property int|null $delivery_zone_id
+ * @property int|null $delivery_slot_id
+ * @property string|null $delivery_address_line1
+ * @property string|null $delivery_address_line2
+ * @property string|null $delivery_city
+ * @property string|null $delivery_state
+ * @property string|null $delivery_zip
+ * @property int $delivery_fee_cents
+ * @property int $delivery_attempts
+ * @property string|null $delivery_otp
+ * @property Carbon|null $ready_notified_at
+ * @property Carbon|null $pickup_reminder_sent_at
+ * @property int $refunded_cents
+ * @property int|null $driver_id
  * @property string|null $notes
  * @property int $lead_time_days
  * @property Carbon|null $scheduled_date
@@ -57,6 +73,10 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, OrderItem> $items
  * @property-read Collection<int, PaymentTransaction> $transactions
  * @property-read Collection<int, QcCheck> $qcChecks
+ * @property-read Collection<int, DeliveryEvent> $deliveryEvents
+ * @property-read DeliveryZone|null $deliveryZone
+ * @property-read DeliverySlot|null $deliverySlot
+ * @property-read User|null $driver
  * @property-read Invoice|null $invoice
  */
 class Order extends Model
@@ -79,6 +99,12 @@ class Order extends Model
     {
         return [
             'status' => OrderStatus::class,
+            'fulfilment_status' => FulfilmentStatus::class,
+            'delivery_fee_cents' => 'integer',
+            'delivery_attempts' => 'integer',
+            'ready_notified_at' => 'datetime',
+            'pickup_reminder_sent_at' => 'datetime',
+            'refunded_cents' => 'integer',
             'lead_time_days' => 'integer',
             'scheduled_date' => 'date',
             'estimated_cents' => 'integer',
@@ -129,6 +155,30 @@ class Order extends Model
         return $this->hasMany(QcCheck::class)->orderBy('id');
     }
 
+    /** @return HasMany<DeliveryEvent, $this> */
+    public function deliveryEvents(): HasMany
+    {
+        return $this->hasMany(DeliveryEvent::class)->orderBy('id');
+    }
+
+    /** @return BelongsTo<DeliveryZone, $this> */
+    public function deliveryZone(): BelongsTo
+    {
+        return $this->belongsTo(DeliveryZone::class, 'delivery_zone_id');
+    }
+
+    /** @return BelongsTo<DeliverySlot, $this> */
+    public function deliverySlot(): BelongsTo
+    {
+        return $this->belongsTo(DeliverySlot::class, 'delivery_slot_id');
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function driver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'driver_id');
+    }
+
     /** @return HasOne<Invoice, $this> */
     public function invoice(): HasOne
     {
@@ -166,6 +216,20 @@ class Order extends Model
 
     public function totalChargedCents(): int
     {
-        return $this->captured_cents + $this->extra_charged_cents + $this->balance_paid_cents;
+        return $this->captured_cents + $this->extra_charged_cents + $this->balance_paid_cents - $this->refunded_cents;
+    }
+
+    /** Constant-time check of the delivery OTP the driver was told at handoff (guideline S05 proof of delivery). */
+    public function matchesDeliveryOtp(?string $otp): bool
+    {
+        return $otp !== null && $otp !== '' && $this->delivery_otp !== null
+            && hash_equals($this->delivery_otp, $otp);
+    }
+
+    public function fullDeliveryAddress(): string
+    {
+        return collect([$this->delivery_address_line1, $this->delivery_address_line2, "{$this->delivery_city}, {$this->delivery_state} {$this->delivery_zip}"])
+            ->filter()
+            ->implode(', ');
     }
 }

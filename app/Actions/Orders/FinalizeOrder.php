@@ -43,7 +43,9 @@ final class FinalizeOrder extends Action
                 throw ValidationException::withMessages(['order' => 'The card hold has expired — contact the customer to pay again.']);
             }
 
-            $final = (int) $locked->items->sum(fn ($item) => (int) $item->final_cents);
+            // The delivery fee is a fixed, order-level charge (guideline S05) — it rode along in the
+            // estimate and hold, so it must ride along in the final total too, or it never gets charged.
+            $final = (int) $locked->items->sum(fn ($item) => (int) $item->final_cents) + $locked->delivery_fee_cents;
             $plan = SettlementPlan::for(
                 estimatedCents: $locked->estimated_cents,
                 holdCents: $locked->hold_cents,

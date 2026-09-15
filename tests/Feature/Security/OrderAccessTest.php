@@ -20,10 +20,10 @@ beforeEach(function () {
 function placeGuestOrder(object $ctx, ?User $user = null): array
 {
     return app(PlaceOrder::class)->handle(
-        [$ctx->product->id => 1],
-        ['customer_name' => 'Test Buyer', 'customer_email' => 'buyer@example.com', 'customer_phone' => '2675550123'],
-        1100,
-        $user,
+        lines: [$ctx->product->id => 1],
+        customer: ['customer_name' => 'Test Buyer', 'customer_email' => 'buyer@example.com', 'customer_phone' => '2675550123'],
+        expectedHoldCents: 1100,
+        user: $user,
     );
 }
 

@@ -7,6 +7,7 @@ namespace App\Payments;
 use App\Payments\Data\ChargeResult;
 use App\Payments\Data\HostedPaymentLink;
 use App\Payments\Data\IntentState;
+use App\Payments\Data\RefundResult;
 use App\Payments\Data\WebhookEvent;
 use App\Payments\Exceptions\InvalidWebhookSignature;
 use App\Payments\Exceptions\PaymentsNotConfigured;
@@ -120,6 +121,20 @@ final class StripeGateway implements PaymentGateway
         ], ['idempotency_key' => $idempotencyKey]);
 
         return new HostedPaymentLink($session->id, (string) $session->url);
+    }
+
+    public function refund(string $intentId, int $amountCents, string $idempotencyKey): RefundResult
+    {
+        try {
+            $refund = $this->client()->refunds->create([
+                'payment_intent' => $intentId,
+                'amount' => $amountCents,
+            ], ['idempotency_key' => $idempotencyKey]);
+
+            return new RefundResult($refund->status === 'succeeded' || $refund->status === 'pending', $refund->id, $refund->status === 'failed' ? $refund->failure_reason : null);
+        } catch (CardException $e) {
+            return new RefundResult(false, null, $e->getMessage());
+        }
     }
 
     public function parseWebhook(string $payload, string $signatureHeader): WebhookEvent

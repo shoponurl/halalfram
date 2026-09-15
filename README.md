@@ -33,4 +33,5 @@ Create real staff in production with `php artisan staff:create`.
 - [x] **Sprint 02: catalog & cut options.** See [docs/sprint-02.md](docs/sprint-02.md) — real photos and your full catalog still need adding via `/admin/products` in staging.
 - [x] **Sprint 03: inventory, lot & cold storage.** See [docs/sprint-03.md](docs/sprint-03.md) — real stock still needs receiving via `/admin/lots` in staging.
 - [x] **Sprint 04: order processing & the butcher workflow.** See [docs/sprint-04.md](docs/sprint-04.md) — Reverb (live updates) deliberately deferred; the production board polls instead.
-- [ ] Sprint 05: local delivery & pickup
+- [x] **Sprint 05: local delivery & pickup.** See [docs/sprint-05.md](docs/sprint-05.md) — real service zones/zips/slots and a real cron/`schedule:work` for the missed-pickup job still need setting up in staging/production.
+- [ ] Sprint 06: customer notifications (SMS/email)

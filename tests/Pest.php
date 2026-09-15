@@ -10,10 +10,13 @@ use App\Enums\StorageLocation;
 use App\Models\Animal;
 use App\Models\Category;
 use App\Models\CutOption;
+use App\Models\DeliverySlot;
+use App\Models\DeliveryZone;
 use App\Models\Lot;
 use App\Models\OffalOption;
 use App\Models\PackingOption;
 use App\Models\Product;
+use App\Models\ServiceZip;
 use App\Models\User;
 use App\Payments\FakePaymentGateway;
 use App\Payments\PaymentGateway;
@@ -155,4 +158,34 @@ function lot(Product $product, string $onHandLb = '20.000', int $useByDaysFromNo
     $lotModel->save();
 
     return $lotModel;
+}
+
+/** A delivery zone with one zip code already in its service area. */
+function deliveryZoneForZip(string $zip = '19050', int $feeCents = 500): DeliveryZone
+{
+    $zone = new DeliveryZone;
+    $zone->name = 'Zone '.$zip;
+    $zone->flat_fee_cents = $feeCents;
+    $zone->is_active = true;
+    $zone->save();
+
+    $serviceZip = new ServiceZip;
+    $serviceZip->zip_code = $zip;
+    $serviceZip->delivery_zone_id = $zone->id;
+    $serviceZip->save();
+
+    return $zone;
+}
+
+/** An upcoming delivery slot, e.g. deliverySlot(daysAhead: 2, capacity: 1). */
+function deliverySlot(int $daysAhead = 1, int $capacity = 1): DeliverySlot
+{
+    $slot = new DeliverySlot;
+    $slot->date = now()->addDays($daysAhead)->toDateString();
+    $slot->start_time = '16:00';
+    $slot->end_time = '18:00';
+    $slot->capacity = $capacity;
+    $slot->save();
+
+    return $slot;
 }

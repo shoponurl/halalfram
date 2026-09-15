@@ -74,4 +74,10 @@ class OrderPolicy
     {
         return $user->can(Permission::RecordWeights->value) && $order->status !== OrderStatus::PendingPayment;
     }
+
+    /** Guideline ch. 6, Sprint 05: pickup/delivery status only moves once the order is actually paid. */
+    public function manageFulfilment(User $user, Order $order): bool
+    {
+        return $user->can(Permission::ManageDeliveries->value) && in_array($order->status, [OrderStatus::Completed, OrderStatus::AwaitingBalance], true);
+    }
 }

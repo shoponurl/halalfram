@@ -7,6 +7,7 @@ namespace App\Payments;
 use App\Payments\Data\ChargeResult;
 use App\Payments\Data\HostedPaymentLink;
 use App\Payments\Data\IntentState;
+use App\Payments\Data\RefundResult;
 use App\Payments\Data\WebhookEvent;
 use App\Payments\Exceptions\InvalidWebhookSignature;
 
@@ -40,6 +41,9 @@ interface PaymentGateway
 
     /** @param array<string, string> $metadata */
     public function createPaymentLink(string $customerId, int $amountCents, string $description, string $successUrl, array $metadata, string $idempotencyKey): HostedPaymentLink;
+
+    /** Refunds a captured PaymentIntent, in whole or in part (guideline ch. 6, Sprint 05: missed pickup/delivery). */
+    public function refund(string $intentId, int $amountCents, string $idempotencyKey): RefundResult;
 
     /** @throws InvalidWebhookSignature */
     public function parseWebhook(string $payload, string $signatureHeader): WebhookEvent;

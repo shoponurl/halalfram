@@ -4,11 +4,19 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Orders\Pages;
 
+use App\Actions\Delivery\MarkDelivered;
+use App\Actions\Delivery\MarkDeliveryFailed;
+use App\Actions\Delivery\MarkOutForDelivery;
+use App\Actions\Delivery\MarkPickedUp;
+use App\Actions\Delivery\MarkReadyForPickup;
+use App\Actions\Delivery\RescheduleDelivery;
 use App\Actions\Orders\ApproveUnderweight;
 use App\Actions\Orders\FinalizeOrder;
 use App\Actions\Orders\RecordQcCheck;
+use App\Enums\FulfilmentStatus;
 use App\Enums\OrderStatus;
 use App\Filament\Resources\Orders\OrderResource;
+use App\Models\DeliverySlot;
 use App\Models\Order;
 use App\Models\User;
 use App\Support\Cents;
@@ -16,7 +24,9 @@ use App\Support\CuttingSheetPdf;
 use App\Support\SettlementPlan;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -124,7 +134,117 @@ class ViewOrder extends ViewRecord
                     },
                     "cutting-sheet-{$record->number}.pdf",
                 )),
+
+            Action::make('markReadyForPickup')
+                ->label('Mark ready for pickup')
+                ->icon('heroicon-o-bell-alert')
+                ->color('primary')
+                ->authorize(fn (Order $record) => auth()->user()?->can('manageFulfilment', $record) ?? false)
+                ->visible(fn (Order $record) => $record->fulfilment === 'pickup' && $record->fulfilment_status === FulfilmentStatus::AwaitingFulfilment)
+                ->action(fn (Order $record) => $this->runFulfilment(fn (User $user) => app(MarkReadyForPickup::class)->handle($record, $user), 'Marked ready for pickup')),
+
+            Action::make('markPickedUp')
+                ->label('Mark picked up')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->authorize(fn (Order $record) => auth()->user()?->can('manageFulfilment', $record) ?? false)
+                ->visible(fn (Order $record) => $record->fulfilment_status === FulfilmentStatus::ReadyForPickup)
+                ->action(fn (Order $record) => $this->runFulfilment(fn (User $user) => app(MarkPickedUp::class)->handle($record, $user), 'Marked picked up')),
+
+            Action::make('markOutForDelivery')
+                ->label('Dispatch for delivery')
+                ->icon('heroicon-o-truck')
+                ->color('primary')
+                ->authorize(fn (Order $record) => auth()->user()?->can('manageFulfilment', $record) ?? false)
+                ->visible(fn (Order $record) => $record->fulfilment === 'delivery' && in_array($record->fulfilment_status, [FulfilmentStatus::AwaitingFulfilment, FulfilmentStatus::DeliveryFailed], true))
+                ->action(function (Order $record): void {
+                    /** @var User $user */
+                    $user = auth()->user();
+                    $updated = app(MarkOutForDelivery::class)->handle($record, $user);
+                    Notification::make()->success()->title('Out for delivery')->body("Code for the customer: {$updated->delivery_otp}")->persistent()->send();
+                    $this->redirect(OrderResource::getUrl('view', ['record' => $record]));
+                }),
+
+            Action::make('markDelivered')
+                ->label('Mark delivered')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->authorize(fn (Order $record) => auth()->user()?->can('manageFulfilment', $record) ?? false)
+                ->visible(fn (Order $record) => $record->fulfilment_status === FulfilmentStatus::OutForDelivery)
+                ->schema([
+                    TextInput::make('otp')->label('Customer\'s code'),
+                    FileUpload::make('proof_photo_path')->label('Or a photo')->image()->disk('public')->directory('delivery-proof'),
+                ])
+                ->action(function (Order $record, array $data): void {
+                    /** @var User $user */
+                    $user = auth()->user();
+                    try {
+                        app(MarkDelivered::class)->handle($record, $user, $data['otp'] ?: null, $data['proof_photo_path'] ?? null);
+                    } catch (ValidationException $e) {
+                        Notification::make()->danger()->title('Not marked delivered')->body(collect($e->errors())->flatten()->implode(' '))->send();
+
+                        return;
+                    }
+                    Notification::make()->success()->title('Delivered')->send();
+                    $this->redirect(OrderResource::getUrl('view', ['record' => $record]));
+                }),
+
+            Action::make('markDeliveryFailed')
+                ->label('Delivery attempt failed')
+                ->icon('heroicon-o-x-circle')
+                ->color('danger')
+                ->authorize(fn (Order $record) => auth()->user()?->can('manageFulfilment', $record) ?? false)
+                ->visible(fn (Order $record) => $record->fulfilment_status === FulfilmentStatus::OutForDelivery)
+                ->schema([
+                    Textarea::make('note')->label('What happened')->required()->rows(2),
+                ])
+                ->action(function (Order $record, array $data): void {
+                    /** @var User $user */
+                    $user = auth()->user();
+                    $updated = app(MarkDeliveryFailed::class)->handle($record, $user, (string) $data['note']);
+                    $updated->fulfilment_status === FulfilmentStatus::Returned
+                        ? Notification::make()->warning()->title('Returned to shop — refund issued minus the delivery fee')->persistent()->send()
+                        : Notification::make()->warning()->title('Delivery failed — one free re-attempt left')->send();
+                    $this->redirect(OrderResource::getUrl('view', ['record' => $record]));
+                }),
+
+            Action::make('rescheduleDelivery')
+                ->label('Reschedule delivery')
+                ->icon('heroicon-o-calendar')
+                ->color('gray')
+                ->authorize(fn (Order $record) => auth()->user()?->can('manageFulfilment', $record) ?? false)
+                ->visible(fn (Order $record) => $record->fulfilment_status === FulfilmentStatus::DeliveryFailed)
+                ->schema([
+                    Select::make('delivery_slot_id')->label('New window')->required()
+                        ->options(fn () => DeliverySlot::query()->upcoming()->get()->mapWithKeys(fn (DeliverySlot $s) => [$s->id => $s->label()])),
+                ])
+                ->action(function (Order $record, array $data): void {
+                    /** @var User $user */
+                    $user = auth()->user();
+                    try {
+                        app(RescheduleDelivery::class)->handle($record, DeliverySlot::query()->findOrFail((int) $data['delivery_slot_id']), $user);
+                    } catch (ValidationException $e) {
+                        Notification::make()->danger()->title('Not rescheduled')->body(collect($e->errors())->flatten()->implode(' '))->send();
+
+                        return;
+                    }
+                    Notification::make()->success()->title('Rescheduled')->send();
+                    $this->redirect(OrderResource::getUrl('view', ['record' => $record]));
+                }),
         ];
+    }
+
+    private function runFulfilment(callable $callback, string $successTitle): void
+    {
+        try {
+            $callback(auth()->user());
+        } catch (ValidationException $e) {
+            Notification::make()->danger()->title('Not updated')->body(collect($e->errors())->flatten()->implode(' '))->send();
+
+            return;
+        }
+        Notification::make()->success()->title($successTitle)->send();
+        $this->redirect(OrderResource::getUrl('view', ['record' => $this->getRecord()]));
     }
 
     /** @param callable(User): SettlementPlan $callback */

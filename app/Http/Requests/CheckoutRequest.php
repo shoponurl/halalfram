@@ -23,6 +23,13 @@ final class CheckoutRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:500'],
             'expected_hold_cents' => ['required', 'integer', 'min:0'],
             'agree_catch_weight' => ['accepted'],
+            'fulfilment_method' => ['required', 'in:pickup,delivery'],
+            'delivery_address_line1' => ['required_if:fulfilment_method,delivery', 'nullable', 'string', 'max:190'],
+            'delivery_address_line2' => ['nullable', 'string', 'max:190'],
+            'delivery_city' => ['required_if:fulfilment_method,delivery', 'nullable', 'string', 'max:80'],
+            'delivery_state' => ['required_if:fulfilment_method,delivery', 'nullable', 'string', 'size:2'],
+            'delivery_zip' => ['required_if:fulfilment_method,delivery', 'nullable', 'string', 'regex:/^\d{5}$/'],
+            'delivery_slot_id' => ['required_if:fulfilment_method,delivery', 'nullable', 'integer', 'exists:delivery_slots,id'],
             // Rule 02 / gap 02: the client never sends money or price fields. Reject rather than ignore.
             'amount' => ['prohibited'],
             'amount_cents' => ['prohibited'],
@@ -31,6 +38,7 @@ final class CheckoutRequest extends FormRequest
             'hold_cents' => ['prohibited'],
             'total' => ['prohibited'],
             'estimated_cents' => ['prohibited'],
+            'delivery_fee_cents' => ['prohibited'],
         ];
     }
 
@@ -40,6 +48,7 @@ final class CheckoutRequest extends FormRequest
         return [
             'agree_catch_weight.accepted' => 'Please confirm you understand the final price is based on actual weight.',
             'customer_phone.regex' => 'Please enter a valid phone number.',
+            'delivery_zip.regex' => 'Please enter a 5-digit zip code.',
         ];
     }
 }

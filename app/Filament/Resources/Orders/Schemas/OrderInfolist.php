@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Orders\Schemas;
 
+use App\Enums\FulfilmentStatus;
 use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Support\Cents;
@@ -52,6 +53,27 @@ class OrderInfolist
                         TextEntry::make('stripe_payment_intent_id')->label('Stripe payment')
                             ->url(fn (?string $state) => $state ? "https://dashboard.stripe.com/payments/{$state}" : null)
                             ->openUrlInNewTab()->placeholder('—'),
+                    ]),
+                Section::make('Fulfilment')
+                    ->columnSpanFull()
+                    ->columns(3)
+                    ->schema([
+                        TextEntry::make('fulfilment')->label('Method')->formatStateUsing(fn (string $state) => ucfirst($state)),
+                        TextEntry::make('fulfilment_status')->label('Status')->badge()
+                            ->formatStateUsing(fn (FulfilmentStatus $state) => $state->label())
+                            ->color(fn (FulfilmentStatus $state) => $state->color()),
+                        TextEntry::make('refunded_cents')->label('Refunded')->formatStateUsing($money)->visible(fn (Order $record) => $record->refunded_cents > 0),
+                        TextEntry::make('delivery_address')->label('Address')->state(fn (Order $record) => $record->fullDeliveryAddress())
+                            ->visible(fn (Order $record) => $record->fulfilment === 'delivery')->columnSpan(2),
+                        TextEntry::make('deliveryZone.name')->label('Zone / fee')
+                            ->formatStateUsing(fn (?string $state, Order $record) => trim(($state ?? '—').' · '.Cents::format($record->delivery_fee_cents)))
+                            ->visible(fn (Order $record) => $record->fulfilment === 'delivery'),
+                        TextEntry::make('deliverySlot.label')->label('Window')->state(fn (Order $record) => $record->deliverySlot?->label() ?? '—')
+                            ->visible(fn (Order $record) => $record->fulfilment === 'delivery'),
+                        TextEntry::make('driver.name')->label('Driver')->placeholder('—')
+                            ->visible(fn (Order $record) => $record->fulfilment === 'delivery'),
+                        TextEntry::make('delivery_otp')->label('Customer code')->placeholder('—')
+                            ->visible(fn (Order $record) => $record->fulfilment_status === FulfilmentStatus::OutForDelivery),
                     ]),
                 Section::make('Policy snapshot at checkout')
                     ->columnSpanFull()

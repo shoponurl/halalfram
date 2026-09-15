@@ -1,5 +1,6 @@
 @php($c = \App\Support\Cents::class)
 @php($s = \App\Enums\OrderStatus::class)
+@php($fs = \App\Enums\FulfilmentStatus::class)
 <x-layouts.shop :title="'Order '.$order->number">
     <p class="text-xs font-bold uppercase tracking-[.18em] text-ink-500">Order {{ $order->number }}</p>
     <h1 class="mt-2 font-display text-4xl font-semibold">{{ $order->status->label() }}</h1>
@@ -66,5 +67,36 @@
 
     @if (in_array($order->status, [$s::Completed, $s::AwaitingBalance], true))
         <p class="mt-6 text-right"><a href="{{ route('orders.invoice', $order) }}" class="font-semibold text-brand-700 underline">Download invoice (PDF)</a></p>
+    @endif
+
+    @if ($order->fulfilment_status !== $fs::AwaitingFulfilment || $order->fulfilment === 'delivery')
+        <div class="mt-6 rounded-3xl bg-white p-6 ring-1 ring-bone-200">
+            <h2 class="font-display text-xl font-semibold">{{ $order->fulfilment === 'delivery' ? 'Delivery' : 'Pickup' }}</h2>
+            <p class="mt-1 text-ink-600">{{ $order->fulfilment_status->label() }}</p>
+
+            @if ($order->fulfilment === 'delivery')
+                <p class="mt-2 text-sm text-ink-500">{{ $order->fullDeliveryAddress() }}</p>
+                @if ($order->deliverySlot)
+                    <p class="text-sm text-ink-500">{{ $order->deliverySlot->label() }}</p>
+                @endif
+            @endif
+
+            @if ($order->fulfilment_status === $fs::OutForDelivery && $order->delivery_otp)
+                <p class="mt-4 rounded-xl bg-halal-50 p-3 text-sm font-semibold text-halal-700">
+                    Give this code to the driver when your order arrives: <span class="text-lg tracking-widest">{{ $order->delivery_otp }}</span>
+                </p>
+            @endif
+
+            @if ($order->fulfilment_status === $fs::DeliveryFailed)
+                <p class="mt-4 text-sm text-brand-700">We tried to deliver and missed you — we'll be in touch to reschedule, or call (267) 307-3777.</p>
+            @endif
+
+            @if (in_array($order->fulfilment_status, [$fs::Returned, $fs::MissedPickup, $fs::Refunded], true))
+                <p class="mt-4 text-sm text-ink-600">
+                    This order wasn't completed.
+                    {{ $order->refunded_cents > 0 ? 'A refund of '.$c::format($order->refunded_cents).' has been issued.' : 'A refund is being processed.' }}
+                </p>
+            @endif
+        </div>
     @endif
 </x-layouts.shop>

@@ -92,8 +92,8 @@
                 @continue(in_array($t->type->value, ['authorization', 'balance_link', 'write_off', 'cancel'], true))
                 <tr>
                     <td>{{ $t->created_at->timezone('America/New_York')->format('M j, Y g:i A') }}</td>
-                    <td>{{ ['capture' => 'Card payment (captured from hold)', 'extra_charge' => 'Card payment (weight above hold)', 'balance_paid' => 'Balance payment link'][$t->type->value] ?? $t->type->value }}</td>
-                    <td class="r">{{ $c::format($t->amount_cents) }}</td>
+                    <td>{{ ['capture' => 'Card payment (captured from hold)', 'extra_charge' => 'Card payment (weight above hold)', 'balance_paid' => 'Balance payment link', 'refund' => 'Refund'][$t->type->value] ?? $t->type->value }}</td>
+                    <td class="r">{{ $t->type->value === 'refund' ? '−'.$c::format($t->amount_cents) : $c::format($t->amount_cents) }}</td>
                 </tr>
             @endforeach
             <tr><td></td><td><strong>Total paid</strong></td><td class="r"><strong>{{ $c::format($order->totalChargedCents()) }}</strong></td></tr>

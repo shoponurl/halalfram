@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Actions\Orders;
 
 use App\Actions\Action;
+use App\Actions\Delivery\ReserveDeliverySlot;
 use App\Actions\Inventory\ReleaseStock;
 use App\Actions\Inventory\ReserveStock;
 use App\Actions\Production\ScheduleOrder;
+use App\Enums\FulfilmentStatus;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentTransactionType;
 use App\Models\Order;
@@ -33,15 +35,17 @@ final class PlaceOrder extends Action
         private readonly ReserveStock $reserveStock,
         private readonly ReleaseStock $releaseStock,
         private readonly ScheduleOrder $scheduleOrder,
+        private readonly ReserveDeliverySlot $reserveDeliverySlot,
     ) {}
 
     /**
      * @param  array<int|string, int|array<string, int|null>>  $lines  raw cart lines, straight from the session
      * @param  array{customer_name: string, customer_email: string, customer_phone: string, notes?: string|null}  $customer
-     * @param  int  $expectedHoldCents  the hold the customer saw; any difference means prices changed or were tampered with
+     * @param  int  $expectedHoldCents  the hold the customer saw (including any delivery fee); any difference means prices changed or were tampered with
+     * @param  array{method?: string, address_line1?: string, address_line2?: string|null, city?: string, state?: string, zip?: string, delivery_slot_id?: int}  $fulfilment  defaults to store pickup
      * @return array{order: Order, token: string}
      */
-    public function handle(array $lines, array $customer, int $expectedHoldCents, ?User $user = null): array
+    public function handle(array $lines, array $customer, int $expectedHoldCents, array $fulfilment = ['method' => 'pickup'], ?User $user = null): array
     {
         if ($lines === []) {
             throw ValidationException::withMessages(['cart' => 'Your cart is empty.']);
@@ -49,16 +53,29 @@ final class PlaceOrder extends Action
 
         $token = Str::random(48);
 
-        $order = $this->transaction(function () use ($lines, $customer, $expectedHoldCents, $user, $token): Order {
+        $order = $this->transaction(function () use ($lines, $customer, $fulfilment, $expectedHoldCents, $user, $token): Order {
             $quote = $this->quote->handle($lines, lockProducts: true);
 
+            $isDelivery = ($fulfilment['method'] ?? 'pickup') === 'delivery';
+            $deliveryZone = null;
+            $deliverySlot = null;
+            if ($isDelivery) {
+                // Owner decision (guideline ch. 7, S05): the service area is an explicit zip list.
+                $deliveryZone = $this->reserveDeliverySlot->zoneForZip((string) ($fulfilment['zip'] ?? ''));
+                $deliverySlot = $this->reserveDeliverySlot->handle((int) ($fulfilment['delivery_slot_id'] ?? 0));
+            }
+            $deliveryFeeCents = $deliveryZone->flat_fee_cents ?? 0;
+
+            $totalEstimatedCents = $quote['estimated_cents'] + $deliveryFeeCents;
+            $totalHoldCents = $quote['hold_cents'] + $deliveryFeeCents;
+
             // Rule 02: amounts are computed here; the browser's number is only a cross-check
-            if ($quote['hold_cents'] !== $expectedHoldCents) {
+            if ($totalHoldCents !== $expectedHoldCents) {
                 throw ValidationException::withMessages([
                     'cart' => 'Prices changed since you opened checkout. Please review the new total and try again.',
                 ]);
             }
-            if ($quote['hold_cents'] < (int) config('catchweight.minimum_charge_cents')) {
+            if ($totalHoldCents < (int) config('catchweight.minimum_charge_cents')) {
                 throw ValidationException::withMessages(['cart' => 'The order total is below the card minimum.']);
             }
 
@@ -76,12 +93,23 @@ final class PlaceOrder extends Action
             $order->public_token_hash = hash('sha256', $token);
             $order->user_id = $user?->id;
             $order->status = OrderStatus::PendingPayment;
-            $order->fulfilment = 'pickup';
+            $order->fulfilment = $isDelivery ? 'delivery' : 'pickup';
+            $order->fulfilment_status = FulfilmentStatus::AwaitingFulfilment;
             $order->lead_time_days = $quote['lead_time_days'];
             $order->scheduled_date = $scheduledDate;
-            $order->estimated_cents = $quote['estimated_cents'];
-            $order->hold_cents = $quote['hold_cents'];
+            $order->estimated_cents = $totalEstimatedCents;
+            $order->hold_cents = $totalHoldCents;
             $order->currency = (string) config('catchweight.currency');
+            $order->delivery_fee_cents = $deliveryFeeCents;   // 0 for pickup — set unconditionally so it's never left null in-memory
+            if ($isDelivery) {
+                $order->delivery_zone_id = $deliveryZone?->id;
+                $order->delivery_slot_id = $deliverySlot?->id;
+                $order->delivery_address_line1 = (string) ($fulfilment['address_line1'] ?? '');
+                $order->delivery_address_line2 = $fulfilment['address_line2'] ?? null;
+                $order->delivery_city = (string) ($fulfilment['city'] ?? '');
+                $order->delivery_state = (string) ($fulfilment['state'] ?? 'PA');
+                $order->delivery_zip = (string) ($fulfilment['zip'] ?? '');
+            }
             $order->hold_tolerance_pct = self::pct('catchweight.hold_tolerance_pct');
             $order->overage_autocharge_pct = self::pct('catchweight.overage_autocharge_pct');
             $order->underweight_review_pct = self::pct('catchweight.underweight_review_pct');
