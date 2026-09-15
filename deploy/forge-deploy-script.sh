@@ -11,7 +11,8 @@ npm run build
 ( flock -w 10 9 || exit 1
     echo 'Restarting FPM...'; sudo -S service $FORGE_PHP_FPM reload ) 9>/tmp/fpmlock
 
-$FORGE_PHP artisan migrate --force
+# Migrations run as the privileged halal_migrate user; the site itself can't ALTER or DROP (launch gate, S09)
+$FORGE_PHP artisan migrate --force --database=mysql_migrate
 $FORGE_PHP artisan db:seed --class=RolesAndPermissionsSeeder --force   # idempotent: keeps the 6 roles in sync
 $FORGE_PHP artisan filament:optimize
 $FORGE_PHP artisan optimize

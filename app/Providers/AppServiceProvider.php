@@ -18,6 +18,7 @@ use App\Sms\TwilioSmsGateway;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Events\DiagnosingHealth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -87,6 +88,16 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(5)->by('checkout:'.$request->ip()),
             Limit::perHour(30)->by('checkout-hour:'.$request->ip()),
         ]);
+
+        // S09 self-audit SA-01: each link request sends an email — keep it from being used to spam an inbox.
+        RateLimiter::for('store-credit', fn (Request $request) => [
+            Limit::perMinute(3)->by('store-credit:'.$request->ip()),
+            Limit::perHour(5)->by('store-credit-email:'.strtolower(trim((string) $request->input('credit_email')))),
+        ]);
+
+        // Guideline ch. 8 launch gate (monitoring): /up is what the external uptime monitor polls. By
+        // default it only proves PHP boots — make a dead database fail it too (the query throws → 500).
+        Event::listen(DiagnosingHealth::class, fn () => DB::select('select 1'));
 
         Event::listen(Login::class, function (Login $event): void {
             if ($event->user instanceof User) {

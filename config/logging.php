@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Logging\CreateAlertLogger;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -80,8 +81,16 @@ return [
             'url' => env('LOG_SLACK_WEBHOOK_URL'),
             'username' => env('LOG_SLACK_USERNAME', 'Laravel Log'),
             'emoji' => env('LOG_SLACK_EMOJI', ':boom:'),
-            'level' => env('LOG_LEVEL', 'critical'),
+            // S09 self-audit SA-07: was LOG_LEVEL, so LOG_LEVEL=debug would have posted every debug line to Slack.
+            'level' => env('LOG_SLACK_LEVEL', 'critical'),
             'replace_placeholders' => true,
+        ],
+
+        // Guideline ch. 8 launch gate: alerts reach a real person. Production: LOG_STACK=daily,alerts.
+        'alerts' => [
+            'driver' => 'custom',
+            'via' => CreateAlertLogger::class,
+            'level' => env('LOG_ALERT_LEVEL', 'critical'),
         ],
 
         'papertrail' => [

@@ -98,7 +98,7 @@ class DriverRoute extends Page implements HasActions, HasSchemas, HasTable
                     ->visible(fn (Order $record) => $record->fulfilment_status === FulfilmentStatus::OutForDelivery)
                     ->schema([
                         TextInput::make('otp')->label("Customer's code")->inputMode('numeric'),
-                        FileUpload::make('proof_photo_path')->label('Or a photo at the door')->image()->disk('public')->directory('delivery-proof'),
+                        FileUpload::make('proof_photo_path')->label('Or a photo at the door')->image()->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])->disk('local')->visibility('private')->directory('delivery-proof')->maxSize(10240),
                     ])
                     ->action(function (Order $record, array $data): void {
                         /** @var User $user */

@@ -24,7 +24,13 @@ vendor/bin/phpstan analyse             # Larastan level 8
 vendor/bin/pint                        # format
 php artisan db:seed                    # 6 roles + one demo account per role (local/staging only)
 php artisan staff:create               # real staff accounts (production)
+php artisan launch:check               # launch gate: DONE / NOT DONE with proof (docs/runbook.md)
+php artisan ops:reconcile              # rebuild every cached balance from its ledger; non-zero exit on mismatch
 ```
+
+Operating the live system (backups, restore/recall/oversell/load drills, key rotation, alerts) is in `docs/runbook.md`.
+A new cached balance over a ledger belongs in `App\Actions\Launch\ReconcileLedgers`; a new production-readiness
+requirement belongs in `App\Enums\LaunchGateItem`.
 
 ## Non-negotiable rules
 

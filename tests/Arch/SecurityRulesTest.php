@@ -78,6 +78,28 @@ it('keeps forbidden patterns out of app code', function (string $pattern, string
     expect($hits)->toBeEmpty($why."\n".implode("\n", $hits));
 })->with(forbiddenPatterns());
 
+it('SA-03/SA-04: restricts every upload to raster image types and keeps delivery-proof photos private', function () {
+    $problems = [];
+    foreach (applicationPhpFiles() as $file) {
+        foreach (file($file) as $n => $line) {
+            if (! str_contains($line, 'FileUpload::make(')) {
+                continue;
+            }
+            $where = basename($file).':'.($n + 1);
+            // Filament's image() alone accepts image/* — including SVG, which can carry script (stored XSS)
+            if (! str_contains($line, "acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])")) {
+                $problems[] = "{$where} must restrict to acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])";
+            }
+            // A photo of a customer's doorstep is personal data: never on the web-served public disk
+            if (str_contains($line, 'proof_photo_path') && ! str_contains($line, "disk('local')")) {
+                $problems[] = "{$where} must store delivery proof on the private 'local' disk";
+            }
+        }
+    }
+
+    expect($problems)->toBeEmpty(implode("\n", $problems));
+});
+
 it('declares $fillable on every Eloquent model', function () {
     $missing = [];
     foreach (glob(dirname(__DIR__, 2).'/app/Models/*.php') as $file) {

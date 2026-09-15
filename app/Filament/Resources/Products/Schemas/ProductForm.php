@@ -30,7 +30,7 @@ class ProductForm
                     Select::make('category_id')->label('Category')->relationship(name: 'category', titleAttribute: 'name')->searchable(),
                     Select::make('portion_type')->options(collect(PortionType::cases())->mapWithKeys(fn (PortionType $p) => [$p->value => $p->label()])),
                     Textarea::make('description')->rows(3)->columnSpanFull(),
-                    FileUpload::make('image_path')->label('Photo')->image()->disk('public')->directory('products')
+                    FileUpload::make('image_path')->label('Photo')->image()->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])->disk('public')->directory('products')
                         ->imageEditor()->maxSize(5120)->columnSpanFull(),
                     TextInput::make('yield_pct')->label('Yield %')->helperText('For Whole/Half/Quarter variants of the same animal.')
                         ->rule('regex:/^\d{1,3}(\.\d{1,2})?$/')->suffix('%'),

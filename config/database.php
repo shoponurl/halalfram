@@ -64,6 +64,28 @@ return [
             ]) : [],
         ],
 
+        // Guideline ch. 8 launch gate: the app's own DB user can't DROP or ALTER. Migrations, backups and
+        // restore drills run as this separate, privileged user instead (deploy/mysql-production-grants.sql).
+        // Falls back to the app user locally, where one root account does everything.
+        'mysql_migrate' => [
+            'driver' => 'mysql',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '3306'),
+            'database' => env('DB_DATABASE', 'laravel'),
+            'username' => env('DB_MIGRATE_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('DB_MIGRATE_PASSWORD', env('DB_PASSWORD', '')),
+            'unix_socket' => env('DB_SOCKET', ''),
+            'charset' => env('DB_CHARSET', 'utf8mb4'),
+            'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),

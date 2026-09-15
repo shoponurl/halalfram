@@ -12,9 +12,11 @@
             <label class="flex items-center gap-2 text-sm font-semibold">
                 <input type="radio" name="fulfilment" value="pickup" class="accent-brand-700" onchange="this.form.requestSubmit()" @checked($fulfilmentMethod === 'pickup') /> Store pickup
             </label>
-            <label class="flex items-center gap-2 text-sm font-semibold">
-                <input type="radio" name="fulfilment" value="delivery" class="accent-brand-700" onchange="this.form.requestSubmit()" @checked($fulfilmentMethod === 'delivery') /> Local delivery
-            </label>
+            @if ($deliveryAvailable)
+                <label class="flex items-center gap-2 text-sm font-semibold">
+                    <input type="radio" name="fulfilment" value="delivery" class="accent-brand-700" onchange="this.form.requestSubmit()" @checked($fulfilmentMethod === 'delivery') /> Local delivery
+                </label>
+            @endif
             @if ($shippingReady)
                 <label class="flex items-center gap-2 text-sm font-semibold">
                     <input type="radio" name="fulfilment" value="shipping" class="accent-brand-700" onchange="this.form.requestSubmit()" @checked($fulfilmentMethod === 'shipping') /> Ship nationwide (overnight)
@@ -41,7 +43,6 @@
             </label>
             <button class="h-10 rounded-full bg-brand-800 px-5 text-sm font-bold text-white hover:bg-brand-700">Get shipping rate</button>
         @endif
-        <input type="hidden" name="credit_email" value="{{ $creditEmail }}" />
     </form>
     @if ($zipError)
         <p class="mt-3 rounded-xl bg-brand-50 p-3 text-sm font-semibold text-brand-700">{{ $zipError }}</p>
@@ -50,22 +51,23 @@
         <p class="mt-3 rounded-xl bg-brand-50 p-3 text-sm font-semibold text-brand-700">{{ $shipError }}</p>
     @endif
 
-    {{-- Store credit lookup (guideline ch. 7, S06) — a small GET reload, same pattern as the zip check --}}
-    <form method="get" action="{{ route('checkout.create') }}" class="mt-3 flex flex-wrap items-end gap-3 rounded-3xl bg-white p-5 ring-1 ring-bone-200">
-        <input type="hidden" name="fulfilment" value="{{ $fulfilmentMethod }}" />
-        <input type="hidden" name="zip" value="{{ $zip }}" />
-        <input type="hidden" name="ship_state" value="{{ $shipState }}" />
-        <input type="hidden" name="ship_zip" value="{{ $shipZip }}" />
-        <label class="text-sm font-semibold">
-            Have store credit? Enter your email to check
-            <input name="credit_email" type="email" value="{{ $creditEmail }}" placeholder="you@example.com"
-                   class="mt-1.5 block h-10 w-56 rounded-xl border border-bone-300 px-3 text-base focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-100" />
-        </label>
-        <button class="h-10 rounded-full bg-bone-200 px-5 text-sm font-bold text-ink-900 hover:bg-bone-300">Check balance</button>
-        @if ($creditEmail !== '')
-            <span class="text-sm font-semibold text-halal-600">Available: {{ $c::format($availableCreditCents) }}</span>
-        @endif
-    </form>
+    {{-- Store credit (guideline ch. 7, S06). S09 self-audit SA-01: the balance is only shown after the
+         customer proves the email is theirs by following a link sent to it. --}}
+    @if ($creditEmail !== '')
+        <p class="mt-3 rounded-3xl bg-white p-5 text-sm font-semibold ring-1 ring-bone-200">
+            Store credit for {{ $creditEmail }}: <span class="text-halal-600">{{ $c::format($availableCreditCents) }} available</span>
+        </p>
+    @else
+        <form method="post" action="{{ route('store-credit.send') }}" class="mt-3 flex flex-wrap items-end gap-3 rounded-3xl bg-white p-5 ring-1 ring-bone-200">
+            @csrf
+            <label class="text-sm font-semibold">
+                Have store credit? We'll email you a link to use it
+                <input name="credit_email" type="email" required placeholder="you@example.com"
+                       class="mt-1.5 block h-10 w-56 rounded-xl border border-bone-300 px-3 text-base focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-100" />
+            </label>
+            <button class="h-10 rounded-full bg-bone-200 px-5 text-sm font-bold text-ink-900 hover:bg-bone-300">Email me a link</button>
+        </form>
+    @endif
 
     @if ($fulfilmentMethod === 'pickup' || ($fulfilmentMethod === 'delivery' && $deliveryZone) || ($fulfilmentMethod === 'shipping' && $shippingRateCents > 0))
     <div class="mt-6 grid items-start gap-8 lg:grid-cols-[1fr_380px]">
@@ -141,9 +143,7 @@
                            data-credit-cents="{{ $creditToApplyCents }}" data-hold-cents="{{ $totalHoldCents }}" @checked(old('apply_store_credit')) />
                     <span>Apply my available store credit ({{ $c::format($availableCreditCents) }}) — up to {{ $c::format($creditToApplyCents) }} off this hold.</span>
                 </label>
-                @if ($creditEmail !== '')
-                    <p class="text-xs text-ink-500">Make sure your email above matches {{ $creditEmail }} — store credit is tied to the email it was issued to.</p>
-                @endif
+                <p class="text-xs text-ink-500">Use {{ $creditEmail }} as your email above — store credit is tied to the email it was issued to.</p>
             @endif
 
             <fieldset>

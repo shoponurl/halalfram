@@ -11,6 +11,7 @@ use App\Http\Controllers\Shop\OrderController;
 use App\Http\Controllers\Shop\PayPalReturnController;
 use App\Http\Controllers\Shop\PrivacyRequestController;
 use App\Http\Controllers\Shop\ProductController;
+use App\Http\Controllers\Shop\StoreCreditVerificationController;
 use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\TwilioWebhookController;
 use Illuminate\Support\Facades\Route;
@@ -29,6 +30,8 @@ Route::delete('/cart/{line}', [CartController::class, 'remove'])->name('cart.rem
 
 Route::get('/checkout', [CheckoutController::class, 'create'])->name('checkout.create');
 Route::post('/checkout', [CheckoutController::class, 'store'])->middleware('throttle:checkout')->name('checkout.store');
+Route::post('/checkout/store-credit', [StoreCreditVerificationController::class, 'send'])->middleware('throttle:store-credit')->name('store-credit.send');
+Route::get('/checkout/store-credit/{token}', [StoreCreditVerificationController::class, 'confirm'])->middleware('throttle:30,1')->name('store-credit.confirm');
 Route::get('/checkout/{order}/pay', [CheckoutController::class, 'pay'])->name('checkout.pay');
 Route::get('/checkout/{order}/paypal/return', PayPalReturnController::class)->name('checkout.paypal.return');
 Route::get('/checkout/{order}/paypal/cancel', [PayPalReturnController::class, 'cancel'])->name('checkout.paypal.cancel');

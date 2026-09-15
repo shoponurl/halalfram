@@ -18,6 +18,7 @@ use App\Models\StoreCreditAccount;
 use App\Payments\PaymentGatewayFactory;
 use App\Shipping\ShippingGateway;
 use App\Support\Cart;
+use App\Support\SoftLaunch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -33,8 +34,14 @@ final class CheckoutController extends Controller
             return redirect()->route('cart.show');
         }
 
+        $deliveryAvailable = SoftLaunch::allowsDelivery();
+        $shippingReady = $shippingGateway->isConfigured() && SoftLaunch::allowsShipping();
         $fulfilmentQuery = (string) $request->query('fulfilment');
-        $method = in_array($fulfilmentQuery, ['delivery', 'shipping'], true) ? $fulfilmentQuery : 'pickup';
+        $method = match (true) {
+            $fulfilmentQuery === 'delivery' && $deliveryAvailable => 'delivery',
+            $fulfilmentQuery === 'shipping' && $shippingReady => 'shipping',
+            default => 'pickup',
+        };
         $zip = trim((string) $request->query('zip', ''));
 
         $deliveryZone = null;
@@ -66,14 +73,16 @@ final class CheckoutController extends Controller
             }
         }
 
-        $creditEmail = strtolower(trim((string) $request->query('credit_email', '')));
+        // S09 self-audit SA-01: never look a balance up by a typed-in email — only a verified one.
+        $creditEmail = (string) $request->session()->get(StoreCreditVerificationController::SESSION_KEY, '');
         $availableCreditCents = $creditEmail !== '' ? (StoreCreditAccount::query()->find($creditEmail)->balance_cents ?? 0) : 0;
 
         return view('shop.checkout', [
             'quote' => $quote->handle($cart->lines()),
             'cardReady' => $gateways->for('card')?->isConfigured() ?? false,
             'paypalReady' => $gateways->for('paypal')?->isConfigured() ?? false,
-            'shippingReady' => $shippingGateway->isConfigured(),
+            'shippingReady' => $shippingReady,
+            'deliveryAvailable' => $deliveryAvailable,
             'codMaxCents' => (int) config('catchweight.cod_max_order_cents'),
             'policy' => config('catchweight'),
             'fulfilmentMethod' => $method,
@@ -98,11 +107,19 @@ final class CheckoutController extends Controller
         $isDelivery = $data['fulfilment_method'] === 'delivery';
         $isShipping = $data['fulfilment_method'] === 'shipping';
 
+        $customerEmail = strtolower(trim((string) $data['customer_email']));
+        $applyStoreCredit = (bool) ($data['apply_store_credit'] ?? false);
+        if ($applyStoreCredit && $request->session()->get(StoreCreditVerificationController::SESSION_KEY) !== $customerEmail) {
+            throw ValidationException::withMessages([
+                'apply_store_credit' => 'Store credit can only be used with the email address you confirmed through the link we sent.',
+            ]);
+        }
+
         $result = $placeOrder->handle(
             lines: $cart->lines(),
             customer: [
                 'customer_name' => (string) $data['customer_name'],
-                'customer_email' => strtolower((string) $data['customer_email']),
+                'customer_email' => $customerEmail,
                 'customer_phone' => (string) $data['customer_phone'],
                 'notes' => $data['notes'] ?? null,
                 'marketing_sms_opt_in' => (bool) ($data['marketing_sms_opt_in'] ?? false),
@@ -132,7 +149,7 @@ final class CheckoutController extends Controller
             user: $request->user(),
             paymentMethod: (string) $data['payment_method'],
             couponCode: $data['coupon_code'] ?? null,
-            applyStoreCredit: (bool) ($data['apply_store_credit'] ?? false),
+            applyStoreCredit: $applyStoreCredit,
             regulatoryConsent: true,   // CheckoutRequest already requires agree_regulatory_notice to be accepted
         );
 

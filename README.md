@@ -37,4 +37,12 @@ Create real staff in production with `php artisan staff:create`.
 - [x] **Sprint 06: payment completion & notifications.** See [docs/sprint-06.md](docs/sprint-06.md) — real PayPal/Twilio/Postmark credentials, 10DLC registration, PayPal Vault approval, a PA sales-tax determination and SPF/DKIM/DMARC DNS records still need setting up before launch.
 - [x] **Sprint 07: admin, reports & compliance.** See [docs/sprint-07.md](docs/sprint-07.md) — a real USDA establishment number, a read replica/Metabase instance, a professional ADA/WCAG audit and legal review of the privacy/terms/USDA copy still need doing before launch.
 - [x] **Sprint 08: nationwide cold-chain shipping.** See [docs/sprint-08.md](docs/sprint-08.md) — real EasyPost credentials, a genuine end-to-end overnight test shipment, and the real packing-rule/ship-blackout-date data still need entering before launch.
-- [ ] Sprint 09: hardening & launch
+- [x] **Sprint 09: hardening & launch.** See [docs/sprint-09.md](docs/sprint-09.md) — a self-audit ([docs/security-self-audit.md](docs/security-self-audit.md), 7 findings fixed), soft-launch mode, alerting, ledger reconciliation, backup/restore/recall/oversell/load drills, and `php artisan launch:check`. Still open before launch: the third-party pentest ([brief](docs/pentest-brief.md)), the production drills and key rotation ([docs/runbook.md](docs/runbook.md)), a staging load test, and the staff dry-run day ([docs/staff-guide.md](docs/staff-guide.md)).
+
+## Launch
+
+```bash
+php artisan launch:check          # every launch-gate item: DONE / NOT DONE, with the proof
+```
+
+Runbook: [docs/runbook.md](docs/runbook.md) · Staff guide: [docs/staff-guide.md](docs/staff-guide.md) · Pentest brief: [docs/pentest-brief.md](docs/pentest-brief.md)

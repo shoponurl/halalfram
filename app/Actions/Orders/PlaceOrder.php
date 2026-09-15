@@ -24,6 +24,7 @@ use App\Models\PaymentTransaction;
 use App\Models\User;
 use App\Payments\PaymentGatewayFactory;
 use App\Payments\TaxCalculator;
+use App\Support\SoftLaunch;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use LogicException;
@@ -100,6 +101,7 @@ final class PlaceOrder extends Action
             $shipment = null;
             $shippingRateCents = 0;
             if ($isShipping) {
+                SoftLaunch::assertShippingAllowed();   // guideline ch. 6, S09
                 $shipment = $this->priceShipment->handle($quote['lines'], [
                     'name' => (string) ($customer['customer_name'] ?? ''),
                     'address1' => (string) ($fulfilment['address_line1'] ?? ''),

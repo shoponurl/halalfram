@@ -195,7 +195,7 @@ class ViewOrder extends ViewRecord
                 ->visible(fn (Order $record) => $record->fulfilment_status === FulfilmentStatus::OutForDelivery)
                 ->schema([
                     TextInput::make('otp')->label('Customer\'s code'),
-                    FileUpload::make('proof_photo_path')->label('Or a photo')->image()->disk('public')->directory('delivery-proof'),
+                    FileUpload::make('proof_photo_path')->label('Or a photo')->image()->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])->disk('local')->visibility('private')->directory('delivery-proof')->maxSize(10240),
                 ])
                 ->action(function (Order $record, array $data): void {
                     /** @var User $user */

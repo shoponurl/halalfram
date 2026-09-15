@@ -10,6 +10,7 @@ use App\Models\DeliverySlot;
 use App\Models\DeliveryZone;
 use App\Models\Order;
 use App\Models\ServiceZip;
+use App\Support\SoftLaunch;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -21,6 +22,8 @@ final class ReserveDeliverySlot extends Action
     /** @throws ValidationException if the zip isn't in the service area */
     public function zoneForZip(string $zip): DeliveryZone
     {
+        SoftLaunch::assertDeliveryZipAllowed($zip);
+
         /** @var ServiceZip|null $serviceZip */
         $serviceZip = ServiceZip::query()->with('zone')->find($zip);
         if ($serviceZip === null || ! $serviceZip->zone->is_active) {
