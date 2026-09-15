@@ -8,6 +8,7 @@ use App\Actions\Orders\FinalizeOrder;
 use App\Actions\Orders\MarkOrderAuthorized;
 use App\Actions\Orders\PlaceOrder;
 use App\Actions\Orders\QuoteCart;
+use App\Actions\Orders\RecordQcCheck;
 use App\Actions\Orders\RecordWeight;
 use App\Actions\Payments\HandleStripeWebhook;
 use App\Enums\OrderStatus;
@@ -108,7 +109,9 @@ it('converts the reservation into a consumption once weights are locked, releasi
     $order = $order->fresh();
 
     // Weighed heavier than the 2.000 lb estimate
-    app(RecordWeight::class)->handle($order->items->first(), Weight::pounds('2.400'), WeightSource::Manual, staff(Role::Butcher));
+    $inspector = staff(Role::Butcher);
+    app(RecordWeight::class)->handle($order->items->first(), Weight::pounds('2.400'), WeightSource::Manual, $inspector);
+    app(RecordQcCheck::class)->handle($order->fresh(), true, ['weight_matches' => true], $inspector, '38.0');
     app(FinalizeOrder::class)->handle($order->fresh(['items']), staff(Role::FrontDesk));
 
     $lot = $stockedLot->fresh();

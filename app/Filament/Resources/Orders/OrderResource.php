@@ -7,6 +7,7 @@ namespace App\Filament\Resources\Orders;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
 use App\Filament\Resources\Orders\RelationManagers\ItemsRelationManager;
+use App\Filament\Resources\Orders\RelationManagers\QcChecksRelationManager;
 use App\Filament\Resources\Orders\RelationManagers\TransactionsRelationManager;
 use App\Filament\Resources\Orders\RelationManagers\WeightEventsRelationManager;
 use App\Filament\Resources\Orders\Schemas\OrderInfolist;
@@ -47,6 +48,7 @@ class OrderResource extends Resource
         return [
             ItemsRelationManager::class,
             WeightEventsRelationManager::class,
+            QcChecksRelationManager::class,
             TransactionsRelationManager::class,
         ];
     }

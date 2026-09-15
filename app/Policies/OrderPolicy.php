@@ -50,11 +50,17 @@ class OrderPolicy
         return $user->can(Permission::RecordWeights->value) && $order->status->acceptsWeights() && $order->weights_locked_at === null;
     }
 
-    /** Charging the card is a front-desk/manager decision, not the butcher's. */
+    /** Charging the card is a front-desk/manager decision, not the butcher's — and only once QC passes. */
     public function finalize(User $user, Order $order): bool
     {
         return $user->can(Permission::ManageOrders->value)
-            && in_array($order->status, [OrderStatus::Authorized, OrderStatus::NeedsReview], true);
+            && in_array($order->status, [OrderStatus::QcPassed, OrderStatus::NeedsReview], true);
+    }
+
+    /** Whoever weighs the order can also QC it, once every item has a weight. */
+    public function recordQcCheck(User $user, Order $order): bool
+    {
+        return $user->can(Permission::RecordWeights->value) && $order->status->acceptsQcCheck() && $order->allItemsWeighed();
     }
 
     /** Releasing a large underweight capture needs a manager or owner (owner policy S01). */

@@ -6,6 +6,7 @@ use App\Actions\Orders\FinalizeOrder;
 use App\Actions\Orders\MarkOrderAuthorized;
 use App\Actions\Orders\PlaceOrder;
 use App\Actions\Orders\QuoteCart;
+use App\Actions\Orders\RecordQcCheck;
 use App\Actions\Orders\RecordWeight;
 use App\Enums\Role;
 use App\Enums\WeightSource;
@@ -123,13 +124,15 @@ it('charges the option surcharge on the actual weight, not just the estimate (re
     $order = $order->fresh();
 
     // Weighed at exactly the estimate, so only the surcharge should distinguish final from base price
-    app(RecordWeight::class)->handle($order->items->first(), Weight::pounds('2.000'), WeightSource::Manual, staff(Role::Butcher));
+    $inspector = staff(Role::Butcher);
+    app(RecordWeight::class)->handle($order->items->first(), Weight::pounds('2.000'), WeightSource::Manual, $inspector);
     $order = $order->fresh(['items']);
 
     // base 1798 + cut 400 = 2198
     expect($order->items->first()->final_cents)->toBe(2198);
 
-    $plan = app(FinalizeOrder::class)->handle($order, staff(Role::FrontDesk));
+    app(RecordQcCheck::class)->handle($order, true, ['weight_matches' => true], $inspector, '38.0');
+    $plan = app(FinalizeOrder::class)->handle($order->fresh(), staff(Role::FrontDesk));
     expect($plan->action)->toBe(SettlementPlan::CAPTURE)
         ->and($plan->finalCents)->toBe(2198);
 });

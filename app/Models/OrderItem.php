@@ -32,6 +32,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $packing_option_name
  * @property int $packing_option_price_cents
  * @property int $lead_time_days
+ * @property int|null $estimated_minutes
  * @property int|null $lot_id
  * @property Weight|null $reserved_raw_weight_lb
  * @property Weight|null $consumed_raw_weight_lb
@@ -56,6 +57,7 @@ class OrderItem extends Model
         'packing_option_name',
         'packing_option_price_cents',
         'lead_time_days',
+        'estimated_minutes',
         'lot_id',
         'reserved_raw_weight_lb',
         'consumed_raw_weight_lb',
@@ -75,6 +77,7 @@ class OrderItem extends Model
             'offal_option_price_cents' => 'integer',
             'packing_option_price_cents' => 'integer',
             'lead_time_days' => 'integer',
+            'estimated_minutes' => 'integer',
             'reserved_raw_weight_lb' => WeightCast::class,
             'consumed_raw_weight_lb' => WeightCast::class,
         ];

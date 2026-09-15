@@ -23,6 +23,8 @@ class CutOptionsTable
                 TextColumn::make('cut_style')->formatStateUsing(fn (CutStyle $state) => $state->label()),
                 TextColumn::make('extra_price_cents')->label('Extra price')->formatStateUsing(fn (int $state) => Cents::format($state)),
                 TextColumn::make('extra_lead_time_days')->label('Extra lead time')->formatStateUsing(fn (int $state) => $state.'d'),
+                TextColumn::make('raw_yield_pct')->label('Raw yield')->placeholder('no loss modeled')->formatStateUsing(fn (?string $state) => $state === null ? null : "{$state}%"),
+                TextColumn::make('estimated_minutes')->label('Butcher-min')->placeholder((string) config('catchweight.default_processing_minutes').' (default)'),
                 IconColumn::make('is_active')->boolean(),
             ])
             ->recordActions([

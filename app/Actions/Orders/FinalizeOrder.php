@@ -14,7 +14,9 @@ use App\Support\SettlementPlan;
 use Illuminate\Validation\ValidationException;
 
 /**
- * All lines weighed → decide what the card should be charged (owner policy S01) and hand off to the queue.
+ * QC-passed lines → decide what the card should be charged (owner policy S01) and hand off to the
+ * queue. Owner decision (guideline ch. 7, S04): capture only ever happens after QC passes, never
+ * straight off the scale, so a failed check can never leave a wrong-weight charge to undo.
  */
 final class FinalizeOrder extends Action
 {
@@ -31,7 +33,7 @@ final class FinalizeOrder extends Action
             /** @var Order $locked */
             $locked = Order::query()->with('items')->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
 
-            if (! in_array($locked->status, [OrderStatus::Authorized, OrderStatus::NeedsReview], true)) {
+            if (! in_array($locked->status, [OrderStatus::QcPassed, OrderStatus::NeedsReview], true)) {
                 throw ValidationException::withMessages(['order' => "Order {$locked->number} can’t be finalized while it is “{$locked->status->label()}”."]);
             }
             if (! $locked->allItemsWeighed()) {

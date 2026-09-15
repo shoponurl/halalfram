@@ -6,6 +6,7 @@ use App\Actions\Orders\FinalizeOrder;
 use App\Actions\Orders\IssueInvoice;
 use App\Actions\Orders\MarkOrderAuthorized;
 use App\Actions\Orders\PlaceOrder;
+use App\Actions\Orders\RecordQcCheck;
 use App\Actions\Orders\RecordWeight;
 use App\Enums\Role;
 use App\Enums\WeightSource;
@@ -28,6 +29,7 @@ beforeEach(function () {
     );
     app(MarkOrderAuthorized::class)->handle($order, $this->gateway->authorize($order->stripe_payment_intent_id));
     app(RecordWeight::class)->handle($order->items->first(), Weight::pounds('1.900'), WeightSource::Manual, $this->butcher);
+    app(RecordQcCheck::class)->handle($order->fresh(), true, ['weight_matches' => true], $this->butcher, '38.0');
     app(FinalizeOrder::class)->handle($order->fresh(), $this->frontDesk);
     $this->order = $order->fresh();
 });

@@ -6,6 +6,7 @@ use App\Actions\Orders\ApproveUnderweight;
 use App\Actions\Orders\FinalizeOrder;
 use App\Actions\Orders\MarkOrderAuthorized;
 use App\Actions\Orders\PlaceOrder;
+use App\Actions\Orders\RecordQcCheck;
 use App\Actions\Orders\RecordWeight;
 use App\Enums\OrderStatus;
 use App\Enums\Role;
@@ -46,6 +47,14 @@ function authorizedOrder(object $ctx): Order
     return $order->fresh();
 }
 
+/** Records a passing QC check (owner decision S04: capture never happens straight off the scale). */
+function passQc(object $ctx, Order $order): Order
+{
+    app(RecordQcCheck::class)->handle($order->fresh(), true, ['weight_matches' => true], $ctx->butcher, '38.0');
+
+    return $order->fresh();
+}
+
 it('authorizes the hold and stores the Stripe capture deadline', function () {
     $order = authorizedOrder($this);
 
@@ -71,6 +80,7 @@ it('captures exactly the actual total when weight is within the hold (rule 05: w
 
     // 1.900 lb × 500¢ = 950
     app(RecordWeight::class)->handle($item, Weight::pounds('1.900'), WeightSource::Manual, $this->butcher);
+    passQc($this, $order);
 
     $plan = app(FinalizeOrder::class)->handle($order->fresh(), $this->frontDesk);
     expect($plan->action)->toBe(SettlementPlan::CAPTURE);
@@ -95,6 +105,7 @@ it('auto-charges the difference when weight is above the hold but within +25% of
     $item = $order->items->first();
     // 2.400 lb × 500 = 1200 (hold 1100, ceiling estimate×1.25 = 1250) → auto-charge 100
     app(RecordWeight::class)->handle($item, Weight::pounds('2.400'), WeightSource::Manual, $this->butcher);
+    passQc($this, $order);
 
     app(FinalizeOrder::class)->handle($order->fresh(), $this->frontDesk);
     $order->refresh();
@@ -114,6 +125,7 @@ it('falls back to a payment link when the off-session overage charge is declined
     $order = authorizedOrder($this);
     $item = $order->items->first();
     app(RecordWeight::class)->handle($item, Weight::pounds('2.400'), WeightSource::Manual, $this->butcher);
+    passQc($this, $order);
 
     app(FinalizeOrder::class)->handle($order->fresh(), $this->frontDesk);
     $order->refresh();
@@ -131,6 +143,7 @@ it('sends a payment link (no auto-charge attempted) when weight is far above +25
     $item = $order->items->first();
     // 3.000 lb × 500 = 1500, above ceiling 1250 → capture hold, link the rest
     app(RecordWeight::class)->handle($item, Weight::pounds('3.000'), WeightSource::Manual, $this->butcher);
+    passQc($this, $order);
 
     app(FinalizeOrder::class)->handle($order->fresh(), $this->frontDesk);
     $order->refresh();
@@ -147,6 +160,7 @@ it('cancels the hold and writes off a below-minimum actual total', function () {
     $item = $order->items->first();
     // 0.050 lb × 500 = 25¢, below the 50¢ card minimum, and also >20% under estimate → needs review first
     app(RecordWeight::class)->handle($item, Weight::pounds('0.050'), WeightSource::Manual, $this->butcher);
+    passQc($this, $order);
 
     app(FinalizeOrder::class)->handle($order->fresh(), $this->frontDesk);
     expect($order->fresh()->status)->toBe(OrderStatus::NeedsReview);
@@ -166,6 +180,7 @@ it('holds for manager review on a large underweight and only a manager can appro
     $item = $order->items->first();
     // 1.000 lb × 500 = 500; estimate 1000, floor = 800 → 500 is under the floor
     app(RecordWeight::class)->handle($item, Weight::pounds('1.000'), WeightSource::Manual, $this->butcher);
+    passQc($this, $order);
 
     app(FinalizeOrder::class)->handle($order->fresh(), $this->frontDesk);
     $order->refresh();
@@ -188,9 +203,25 @@ it('will not finalize twice or finalize before every item is weighed', function 
     expect(fn () => app(FinalizeOrder::class)->handle($order, $this->frontDesk))->toThrow(ValidationException::class);
 
     app(RecordWeight::class)->handle($order->items->first(), Weight::pounds('2.000'), WeightSource::Manual, $this->butcher);
+    passQc($this, $order);
     app(FinalizeOrder::class)->handle($order->fresh(), $this->frontDesk);
 
     expect(fn () => app(FinalizeOrder::class)->handle($order->fresh(), $this->frontDesk))->toThrow(ValidationException::class);
+});
+
+it('refuses to finalize before QC passes, even once every item is weighed', function () {
+    $order = authorizedOrder($this);
+    app(RecordWeight::class)->handle($order->items->first(), Weight::pounds('2.000'), WeightSource::Manual, $this->butcher);
+
+    expect(fn () => app(FinalizeOrder::class)->handle($order->fresh(), $this->frontDesk))->toThrow(ValidationException::class);
+
+    app(RecordQcCheck::class)->handle($order->fresh(), false, ['weight_matches' => false], $this->butcher, '38.0', 'Cut looked off, re-checking');
+    expect($order->fresh()->status)->toBe(OrderStatus::QcFailed)
+        ->and($this->butcher->can('recordWeight', $order->fresh()))->toBeTrue();   // still correctable after a failed check
+
+    passQc($this, $order);
+    app(FinalizeOrder::class)->handle($order->fresh(), $this->frontDesk);
+    expect($order->fresh()->status)->toBe(OrderStatus::Completed);
 });
 
 it('refuses to finalize once the authorization has expired', function () {
@@ -198,6 +229,7 @@ it('refuses to finalize once the authorization has expired', function () {
     $order->authorization_expires_at = now()->subMinute();
     $order->save();
     app(RecordWeight::class)->handle($order->items->first(), Weight::pounds('2.000'), WeightSource::Manual, $this->butcher);
+    passQc($this, $order);
 
     expect(fn () => app(FinalizeOrder::class)->handle($order->fresh(), $this->frontDesk))->toThrow(ValidationException::class);
 });
@@ -205,6 +237,7 @@ it('refuses to finalize once the authorization has expired', function () {
 it('settlement is idempotent under retry: each Stripe call happens once per idempotency key', function () {
     $order = authorizedOrder($this);
     app(RecordWeight::class)->handle($order->items->first(), Weight::pounds('1.900'), WeightSource::Manual, $this->butcher);
+    passQc($this, $order);
     app(FinalizeOrder::class)->handle($order->fresh(), $this->frontDesk);
 
     // Simulate a queue retry of the same settlement job after it already succeeded
@@ -217,6 +250,7 @@ it('dispatches settlement to the queue rather than running it inline in the requ
     Queue::fake();
     $order = authorizedOrder($this);
     app(RecordWeight::class)->handle($order->items->first(), Weight::pounds('1.900'), WeightSource::Manual, $this->butcher);
+    passQc($this, $order);
 
     app(FinalizeOrder::class)->handle($order->fresh(), $this->frontDesk);
 

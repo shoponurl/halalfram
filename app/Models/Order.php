@@ -29,6 +29,7 @@ use Illuminate\Support\Carbon;
  * @property string $fulfilment
  * @property string|null $notes
  * @property int $lead_time_days
+ * @property Carbon|null $scheduled_date
  * @property int $estimated_cents
  * @property int $hold_cents
  * @property int|null $final_cents
@@ -55,6 +56,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $created_at
  * @property-read Collection<int, OrderItem> $items
  * @property-read Collection<int, PaymentTransaction> $transactions
+ * @property-read Collection<int, QcCheck> $qcChecks
  * @property-read Invoice|null $invoice
  */
 class Order extends Model
@@ -78,6 +80,7 @@ class Order extends Model
         return [
             'status' => OrderStatus::class,
             'lead_time_days' => 'integer',
+            'scheduled_date' => 'date',
             'estimated_cents' => 'integer',
             'hold_cents' => 'integer',
             'final_cents' => 'integer',
@@ -120,6 +123,12 @@ class Order extends Model
         return $this->hasManyThrough(WeightEvent::class, OrderItem::class);
     }
 
+    /** @return HasMany<QcCheck, $this> */
+    public function qcChecks(): HasMany
+    {
+        return $this->hasMany(QcCheck::class)->orderBy('id');
+    }
+
     /** @return HasOne<Invoice, $this> */
     public function invoice(): HasOne
     {
@@ -147,6 +156,12 @@ class Order extends Model
     public function allItemsWeighed(): bool
     {
         return $this->items->isNotEmpty() && $this->items->every(fn (OrderItem $item) => $item->actual_weight_lb !== null);
+    }
+
+    /** The butcher-minutes this order needs, for the day's capacity budget (owner decision S04). */
+    public function totalProcessingMinutes(): int
+    {
+        return (int) $this->items->sum(fn (OrderItem $item) => $item->estimated_minutes ?? 0);
     }
 
     public function totalChargedCents(): int

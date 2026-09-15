@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $extra_price_cents
  * @property int $extra_lead_time_days
  * @property string|null $raw_yield_pct
+ * @property int|null $estimated_minutes
  * @property bool $is_active
  * @property int $sort_order
  * @property-read Category $category
@@ -34,6 +35,7 @@ class CutOption extends Model
         'extra_price_cents',
         'extra_lead_time_days',
         'raw_yield_pct',
+        'estimated_minutes',
         'is_active',
         'sort_order',
     ];
@@ -46,6 +48,7 @@ class CutOption extends Model
             'extra_price_cents' => 'integer',
             'extra_lead_time_days' => 'integer',
             'raw_yield_pct' => 'decimal:2',
+            'estimated_minutes' => 'integer',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];
@@ -55,6 +58,12 @@ class CutOption extends Model
     public function rawWeightFor(Weight $finishedWeight): Weight
     {
         return $this->raw_yield_pct === null ? $finishedWeight : $finishedWeight->dividedByPercent($this->raw_yield_pct);
+    }
+
+    /** Butcher-minutes needed for one piece with this cut (owner decision, guideline S04). */
+    public function minutesPerPiece(): int
+    {
+        return $this->estimated_minutes ?? (int) config('catchweight.default_processing_minutes');
     }
 
     /** @return BelongsTo<Category, $this> */

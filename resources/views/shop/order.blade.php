@@ -3,6 +3,9 @@
 <x-layouts.shop :title="'Order '.$order->number">
     <p class="text-xs font-bold uppercase tracking-[.18em] text-ink-500">Order {{ $order->number }}</p>
     <h1 class="mt-2 font-display text-4xl font-semibold">{{ $order->status->label() }}</h1>
+    @if ($order->scheduled_date)
+        <p class="mt-1 text-sm text-ink-500">Scheduled for {{ $order->scheduled_date->format('l, M j') }}</p>
+    @endif
 
     <div class="mt-3 max-w-2xl text-ink-600">
         @switch($order->status)
@@ -10,6 +13,8 @@
                 <p>We haven’t received your card authorization yet. <a class="font-semibold text-brand-700 underline" href="{{ route('checkout.pay', $order) }}">Continue to payment</a>.</p>
                 @break
             @case($s::Authorized)
+            @case($s::QcFailed)
+            @case($s::QcPassed)
             @case($s::NeedsReview)
             @case($s::Settling)
                 <p>JazakAllah khair, {{ strtok($order->customer_name, ' ') }}! A hold of {{ $c::format($order->hold_cents) }} is on your card. We’ll charge the actual weight once your order is cut, and call {{ $order->customer_phone }} when it’s ready for pickup.</p>

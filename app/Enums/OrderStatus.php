@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace App\Enums;
 
 /**
- * Sprint 01 catch-weight payment lifecycle. Sprint 04 extends it with the butcher workflow
- * (Scheduled → Cutting → Packed → QC → Dispatched → Delivered).
+ * Sprint 01 catch-weight payment lifecycle, extended by Sprint 04's butcher workflow: once every item
+ * is weighed, a QC check gates capture (owner decision S04) — a failed check sends it back to
+ * QcFailed for re-cutting/re-weighing, never straight to charging the card.
  */
 enum OrderStatus: string
 {
     case PendingPayment = 'pending_payment';        // order saved, customer hasn't authorized the card yet
-    case Authorized = 'authorized';                 // hold placed; waiting for weighing
+    case Authorized = 'authorized';                 // hold placed; waiting for weighing and/or QC
+    case QcFailed = 'qc_failed';                     // QC rejected the cut; needs re-cutting and re-weighing
+    case QcPassed = 'qc_passed';                     // QC approved; ready to finalize and charge
     case NeedsReview = 'needs_review';              // actual total far below estimate; manager must approve
     case Settling = 'settling';                     // weights locked; capture/charges running on the queue
     case AwaitingBalance = 'awaiting_balance';      // hold captured; payment link sent for the rest
@@ -25,6 +28,8 @@ enum OrderStatus: string
         return match ($this) {
             self::PendingPayment => 'Awaiting payment',
             self::Authorized => 'Payment held — ready to weigh',
+            self::QcFailed => 'QC failed — needs re-cutting',
+            self::QcPassed => 'QC passed — ready to finalize',
             self::NeedsReview => 'Needs manager review',
             self::Settling => 'Charging',
             self::AwaitingBalance => 'Awaiting balance payment',
@@ -38,16 +43,22 @@ enum OrderStatus: string
     public function color(): string
     {
         return match ($this) {
-            self::Authorized, self::Settling => 'info',
-            self::NeedsReview, self::AwaitingBalance, self::PendingPayment => 'warning',
+            self::Authorized, self::Settling, self::QcPassed => 'info',
+            self::NeedsReview, self::AwaitingBalance, self::PendingPayment, self::QcFailed => 'warning',
             self::Completed => 'success',
             self::PaymentFailed, self::AuthorizationExpired, self::Cancelled => 'danger',
         };
     }
 
-    /** Weights can still be recorded or corrected. */
+    /** Weights can still be recorded or corrected — including after a failed QC check. */
     public function acceptsWeights(): bool
     {
-        return in_array($this, [self::Authorized, self::NeedsReview], true);
+        return in_array($this, [self::Authorized, self::QcFailed, self::NeedsReview], true);
+    }
+
+    /** All items are weighed and a QC check (pass or fail) can be recorded. */
+    public function acceptsQcCheck(): bool
+    {
+        return in_array($this, [self::Authorized, self::QcFailed], true);
     }
 }

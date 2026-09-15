@@ -32,4 +32,5 @@ Create real staff in production with `php artisan staff:create`.
 - [x] **Sprint 01: vertical slice**, catch-weight order → hold → weight → capture → invoice. See [docs/sprint-01.md](docs/sprint-01.md) — the real $1 Stripe test-mode run is still open, pending your test keys.
 - [x] **Sprint 02: catalog & cut options.** See [docs/sprint-02.md](docs/sprint-02.md) — real photos and your full catalog still need adding via `/admin/products` in staging.
 - [x] **Sprint 03: inventory, lot & cold storage.** See [docs/sprint-03.md](docs/sprint-03.md) — real stock still needs receiving via `/admin/lots` in staging.
-- [ ] Sprint 04: order processing & the butcher workflow
+- [x] **Sprint 04: order processing & the butcher workflow.** See [docs/sprint-04.md](docs/sprint-04.md) — Reverb (live updates) deliberately deferred; the production board polls instead.
+- [ ] Sprint 05: local delivery & pickup

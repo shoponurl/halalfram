@@ -49,6 +49,13 @@ $inventoryRoutes = [
     'lots.edit' => fn (object $ctx) => "/admin/lots/{$ctx->lot->lot_number}/edit",
     'recall-report' => fn () => '/admin/recall-report',
 ];
+$productionDayRoutes = [
+    'production-days.list' => fn () => '/admin/production-days',
+    'production-days.create' => fn () => '/admin/production-days/create',
+];
+$productionBoardRoutes = [
+    'production-board' => fn () => '/admin/production-board',
+];
 
 // Only Owner, Manager, Front desk, Butcher and Accountant have orders.view (App\Enums\Role::permissions())
 $canViewOrders = [Role::Owner, Role::Manager, Role::FrontDesk, Role::Butcher, Role::Accountant];
@@ -88,6 +95,27 @@ foreach (Role::cases() as $role) {
     }
 }
 
+// Only Owner and Manager have catalog.manage — production day budgets are a manager-level setting
+foreach (Role::cases() as $role) {
+    $expected = in_array($role, $canManageCatalog, true) ? 200 : 403;
+    foreach ($productionDayRoutes as $name => $url) {
+        it("returns {$expected} for {$role->label()} on {$name}", function () use ($role, $url, $expected) {
+            $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
+        });
+    }
+}
+
+// Owner, Manager and Butcher have weights.record — the board is a butcher-station tool
+$canRecordWeights = [Role::Owner, Role::Manager, Role::Butcher];
+foreach (Role::cases() as $role) {
+    $expected = in_array($role, $canRecordWeights, true) ? 200 : 403;
+    foreach ($productionBoardRoutes as $name => $url) {
+        it("returns {$expected} for {$role->label()} on {$name}", function () use ($role, $url, $expected) {
+            $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
+        });
+    }
+}
+
 it('lets a butcher print the cutting sheet once the order is authorized, but not before or for other staff', function () {
     $butcher = staff(Role::Butcher);
     $accountant = staff(Role::Accountant);
@@ -102,7 +130,7 @@ it('lets a butcher print the cutting sheet once the order is authorized, but not
         ->and($accountant->can('printCuttingSheet', $this->order))->toBeFalse();
 });
 
-it('lets a butcher record a weight but not finalize the order', function () {
+it('lets a butcher record a weight and QC it, but only front desk finalizes — and only after QC passes', function () {
     $butcher = staff(Role::Butcher);
     $frontDesk = staff(Role::FrontDesk);
 
@@ -114,7 +142,20 @@ it('lets a butcher record a weight but not finalize the order', function () {
     $this->order->save();
 
     expect($butcher->can('recordWeight', $this->order))->toBeTrue()
-        ->and($butcher->can('finalize', $this->order))->toBeFalse()
         ->and($frontDesk->can('recordWeight', $this->order))->toBeFalse()
+        ->and($butcher->can('recordQcCheck', $this->order))->toBeFalse()   // not all items weighed yet
+        ->and($frontDesk->can('finalize', $this->order))->toBeFalse();     // owner decision S04: no finalize before QC
+
+    $item = $this->order->items->first();
+    $item->actual_weight_lb = '1.000';
+    $item->save();
+
+    expect($butcher->can('recordQcCheck', $this->order->fresh()))->toBeTrue()
+        ->and($frontDesk->can('recordQcCheck', $this->order->fresh()))->toBeFalse();
+
+    $this->order->status = OrderStatus::QcPassed;
+    $this->order->save();
+
+    expect($butcher->can('finalize', $this->order))->toBeFalse()
         ->and($frontDesk->can('finalize', $this->order))->toBeTrue();
 });

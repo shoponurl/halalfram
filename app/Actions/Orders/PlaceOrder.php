@@ -7,6 +7,7 @@ namespace App\Actions\Orders;
 use App\Actions\Action;
 use App\Actions\Inventory\ReleaseStock;
 use App\Actions\Inventory\ReserveStock;
+use App\Actions\Production\ScheduleOrder;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentTransactionType;
 use App\Models\Order;
@@ -31,6 +32,7 @@ final class PlaceOrder extends Action
         private readonly QuoteCart $quote,
         private readonly ReserveStock $reserveStock,
         private readonly ReleaseStock $releaseStock,
+        private readonly ScheduleOrder $scheduleOrder,
     ) {}
 
     /**
@@ -60,6 +62,13 @@ final class PlaceOrder extends Action
                 throw ValidationException::withMessages(['cart' => 'The order total is below the card minimum.']);
             }
 
+            $defaultMinutes = (int) config('catchweight.default_processing_minutes');
+            $totalMinutes = array_sum(array_map(
+                fn (array $line) => ($line['cut_option']?->minutesPerPiece() ?? $defaultMinutes) * $line['quantity'],
+                $quote['lines'],
+            ));
+            $scheduledDate = $this->scheduleOrder->handle($totalMinutes);
+
             $order = new Order;
             $order->fill($customer);
             $order->customer_email = strtolower(trim($order->customer_email));   // one normalized form, for every caller
@@ -69,6 +78,7 @@ final class PlaceOrder extends Action
             $order->status = OrderStatus::PendingPayment;
             $order->fulfilment = 'pickup';
             $order->lead_time_days = $quote['lead_time_days'];
+            $order->scheduled_date = $scheduledDate;
             $order->estimated_cents = $quote['estimated_cents'];
             $order->hold_cents = $quote['hold_cents'];
             $order->currency = (string) config('catchweight.currency');
@@ -98,6 +108,7 @@ final class PlaceOrder extends Action
                 $item->packing_option_name = $line['packing_option']?->name;
                 $item->packing_option_price_cents = $line['packing_option']->surcharge_cents ?? 0;
                 $item->lead_time_days = $line['lead_time_days'];
+                $item->estimated_minutes = ($line['cut_option']?->minutesPerPiece() ?? $defaultMinutes) * $line['quantity'];
                 $order->items()->save($item);
 
                 // Sprint 03 (guideline ch. 6): reserves raw stock FEFO; a no-op for products not yet

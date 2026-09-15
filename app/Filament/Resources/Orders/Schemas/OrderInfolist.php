@@ -27,6 +27,7 @@ class OrderInfolist
                         TextEntry::make('status')->badge()
                             ->formatStateUsing(fn (OrderStatus $state) => $state->label())
                             ->color(fn (OrderStatus $state) => $state->color()),
+                        TextEntry::make('scheduled_date')->label('Scheduled for')->date('D, M j')->placeholder('—'),
                         TextEntry::make('estimated_cents')->label('Estimate')->formatStateUsing($money),
                         TextEntry::make('hold_cents')
                             ->label(fn (Order $record) => 'Card hold (estimate + '.rtrim(rtrim($record->hold_tolerance_pct, '0'), '.').'%)')

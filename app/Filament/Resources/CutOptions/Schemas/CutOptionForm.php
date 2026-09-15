@@ -35,6 +35,16 @@ class CutOptionForm
                         ->formatStateUsing(fn ($state) => is_int($state) ? DollarInput::fromCents($state) : $state)
                         ->dehydrateStateUsing(fn ($state) => DollarInput::toCents((string) $state)),
                     TextInput::make('extra_lead_time_days')->label('Extra lead time (days)')->numeric()->default(0)->minValue(0),
+                    TextInput::make('raw_yield_pct')
+                        ->label('Raw yield %')
+                        ->helperText('E.g. 70 for a cut that loses 30% to bone/trim. Leave empty for no modeled loss (guideline S03).')
+                        ->rule('regex:/^\d{1,3}(\.\d{1,2})?$/')
+                        ->suffix('%'),
+                    TextInput::make('estimated_minutes')
+                        ->label('Butcher-minutes per piece')
+                        ->helperText('Leave empty to use the shop default (guideline S04).')
+                        ->placeholder((string) config('catchweight.default_processing_minutes'))
+                        ->numeric()->minValue(0),
                     Toggle::make('is_active')->default(true)->inline(false),
                     TextInput::make('sort_order')->numeric()->default(0),
                 ]),

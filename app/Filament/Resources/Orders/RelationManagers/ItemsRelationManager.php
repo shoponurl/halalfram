@@ -10,6 +10,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
 use App\Support\Cents;
+use App\Support\PackLabelZpl;
 use App\Support\Weight;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
@@ -87,6 +88,24 @@ class ItemsRelationManager extends RelationManager
                             return;
                         }
                         Notification::make()->success()->title('Weight recorded')->send();
+                    }),
+
+                Action::make('printLabel')
+                    ->label('Print label')
+                    ->icon('heroicon-o-printer')
+                    ->color('gray')
+                    ->authorize(fn () => $this->canRecordWeight())
+                    ->visible(fn (OrderItem $record) => $record->lot_id !== null && $record->actual_weight_lb !== null)
+                    ->action(function (OrderItem $record) {
+                        /** @var Order $order */
+                        $order = $this->getOwnerRecord();
+
+                        return response()->streamDownload(
+                            function () use ($record) {
+                                echo app(PackLabelZpl::class)->render($record);
+                            },
+                            "label-{$order->number}-{$record->id}.zpl",
+                        );
                     }),
             ]);
     }

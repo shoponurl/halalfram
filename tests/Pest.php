@@ -83,7 +83,7 @@ function category(string $name = 'Goat', bool $supportsCustomCuts = true): Categ
     return $category;
 }
 
-function cutOption(Category $category, string $name = 'Boneless', int $extraPriceCents = 0, int $extraLeadTimeDays = 0, ?string $rawYieldPct = null): CutOption
+function cutOption(Category $category, string $name = 'Boneless', int $extraPriceCents = 0, int $extraLeadTimeDays = 0, ?string $rawYieldPct = null, ?int $estimatedMinutes = null): CutOption
 {
     $option = new CutOption;
     $option->category_id = $category->id;
@@ -92,6 +92,7 @@ function cutOption(Category $category, string $name = 'Boneless', int $extraPric
     $option->extra_price_cents = $extraPriceCents;
     $option->extra_lead_time_days = $extraLeadTimeDays;
     $option->raw_yield_pct = $rawYieldPct;
+    $option->estimated_minutes = $estimatedMinutes;
     $option->is_active = true;
     $option->save();
 

@@ -32,4 +32,19 @@ return [
     'max_lead_time_days' => 4,
 
     'currency' => 'usd',
+
+    // Owner decisions (guideline ch. 7, S04, recorded 2026-09-15):
+    // Orders placed after this local time are scheduled starting the next production day.
+    'order_cutoff_time' => '15:00',
+
+    // Capacity is measured in butcher-minutes, not weight. A cut option's own estimated_minutes wins;
+    // this is the per-piece default for a standard item (no cut option chosen).
+    'default_processing_minutes' => 5,
+
+    // The shop's default daily processing budget, in butcher-minutes. Override a specific date via
+    // App\Models\ProductionDay (a holiday, extra staff, etc.).
+    'daily_capacity_minutes' => 480,
+
+    // A scheduled order can never be pushed further out than the card hold stays valid — no
+    // re-authorization flow (same call as the Sprint 02 lead-time cap). Reuses authorization_fallback_days.
 ];
