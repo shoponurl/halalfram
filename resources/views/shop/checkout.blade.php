@@ -154,6 +154,16 @@
                 <span>I understand the final price is based on actual weight, and that a hold of {{ $c::format($totalHoldCents) }} is placed until my order is weighed.</span>
             </label>
 
+            {{-- Owner decision (guideline ch. 7, S07, recorded 2026-09-15): USDA-inspected facility. --}}
+            <p class="rounded-xl bg-bone-50 p-3 text-xs text-ink-600">
+                Halal Brothers Live Poultry &amp; Meat operates under full USDA inspection{{ $usdaEstablishmentNumber ? " (Est. No. {$usdaEstablishmentNumber})" : '' }}.
+                All products are processed and sold in compliance with the Federal Meat Inspection Act and Pennsylvania Department of Agriculture requirements.
+            </p>
+            <label class="flex items-start gap-3 text-sm">
+                <input type="checkbox" name="agree_regulatory_notice" value="1" required class="mt-1 h-4 w-4 accent-brand-700" @checked(old('agree_regulatory_notice')) />
+                <span>I've read the USDA inspection notice above.</span>
+            </label>
+
             @if ($cardReady || $paypalReady)
                 <button class="h-12 w-full rounded-full bg-brand-800 text-sm font-bold text-white hover:bg-brand-700">Continue to payment</button>
             @else
@@ -186,9 +196,9 @@
                     <dd>{{ $deliveryFeeCents > 0 ? $c::format($deliveryFeeCents) : 'Free' }}</dd></div>
                 <div class="flex justify-between border-t border-bone-200 pt-1.5"><dt class="font-bold text-ink-900">Estimated total</dt><dd class="font-bold tabular-nums">{{ $c::format($totalEstimatedCents) }}</dd></div>
                 @if ($availableCreditCents > 0)
-                    <div class="flex justify-between"><dt class="text-ink-600">Store credit</dt><dd id="summary-credit" class="tabular-nums">−{{ $c::format(0) }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-ink-600">Store credit</dt><dd id="summary-credit" aria-live="polite" class="tabular-nums">−{{ $c::format(0) }}</dd></div>
                 @endif
-                <div class="flex justify-between"><dt class="text-ink-600">Hold (estimate + {{ $policy['hold_tolerance_pct'] }}%)</dt><dd id="summary-hold" class="tabular-nums">{{ $c::format($totalHoldCents) }}</dd></div>
+                <div class="flex justify-between"><dt class="text-ink-600">Hold (estimate + {{ $policy['hold_tolerance_pct'] }}%)</dt><dd id="summary-hold" aria-live="polite" class="tabular-nums">{{ $c::format($totalHoldCents) }}</dd></div>
             </dl>
         </aside>
     </div>

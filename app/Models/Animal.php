@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Casts\WeightCast;
+use App\Enums\AnimalCostSource;
 use App\Enums\Species;
 use App\Support\Weight;
 use Illuminate\Database\Eloquent\Collection;
@@ -23,6 +24,8 @@ use Illuminate\Support\Carbon;
  * @property Carbon $slaughter_date
  * @property Weight|null $live_weight_lb
  * @property Weight|null $dressed_weight_lb
+ * @property AnimalCostSource $cost_source
+ * @property int|null $cost_cents
  * @property string|null $notes
  * @property int $recorded_by
  * @property-read Collection<int, Lot> $lots
@@ -36,6 +39,8 @@ class Animal extends Model
         'slaughter_date',
         'live_weight_lb',
         'dressed_weight_lb',
+        'cost_source',
+        'cost_cents',
         'notes',
         'recorded_by',
     ];
@@ -48,6 +53,8 @@ class Animal extends Model
             'slaughter_date' => 'date',
             'live_weight_lb' => WeightCast::class,
             'dressed_weight_lb' => WeightCast::class,
+            'cost_source' => AnimalCostSource::class,
+            'cost_cents' => 'integer',
         ];
     }
 
@@ -76,5 +83,14 @@ class Animal extends Model
         }
 
         return $this->live_weight_lb->minus($this->dressed_weight_lb);
+    }
+
+    /**
+     * Owner decision (guideline ch. 7, S07): own-farm animals have no purchase invoice, so their cost
+     * is always a manual estimate — every report must flag it as such, never blend it in as real cost.
+     */
+    public function isCostEstimated(): bool
+    {
+        return $this->cost_source === AnimalCostSource::OwnFarm;
     }
 }

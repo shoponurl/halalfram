@@ -9,9 +9,11 @@ use App\Enums\NotificationEvent;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentTransactionType;
 use App\Jobs\DispatchOrderNotification;
+use App\Models\AuditLog;
 use App\Models\Order;
 use App\Models\PaymentTransaction;
 use App\Models\User;
+use App\Support\Cents;
 use Illuminate\Validation\ValidationException;
 
 /** Guideline ch. 7, S06: cash on pickup — front desk collects and records the amount at handoff. */
@@ -44,6 +46,15 @@ final class RecordCashPayment extends Action
             ]);
             $transaction->recorded_by = $by->id;
             $locked->transactions()->save($transaction);
+
+            $formattedAmount = Cents::format($amountTenderedCents);
+            AuditLog::record(
+                'order.cash_payment_recorded',
+                "Recorded cash payment of {$formattedAmount} for order {$locked->number}",
+                $locked,
+                ['amount_tendered_cents' => $amountTenderedCents],
+                $by,
+            );
 
             $order->setRawAttributes($locked->getAttributes(), true);
 

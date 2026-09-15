@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Animals\Tables;
 
+use App\Enums\AnimalCostSource;
 use App\Enums\Species;
 use App\Models\Animal;
+use App\Support\Cents;
 use App\Support\Weight;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
@@ -27,6 +29,10 @@ class AnimalsTable
                 TextColumn::make('dressed_weight_lb')->label('Dressed weight')->formatStateUsing($lb),
                 TextColumn::make('dressing_loss')->label('Dressing loss')->state(fn (Animal $record) => $lb($record->dressingLoss())),
                 TextColumn::make('lots_count')->counts('lots')->label('Lots'),
+                TextColumn::make('cost_cents')->label('Cost')
+                    ->formatStateUsing(fn (?int $state, Animal $record) => $state === null ? '—' : Cents::format($state).($record->isCostEstimated() ? ' (est.)' : ''))
+                    ->toggleable(),
+                TextColumn::make('cost_source')->label('Source')->formatStateUsing(fn (AnimalCostSource $state) => $state->label())->toggleable(),
             ])
             ->recordActions([
                 EditAction::make(),

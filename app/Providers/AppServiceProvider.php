@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Models\AuditLog;
 use App\Models\User;
 use App\Payments\NullTaxCalculator;
 use App\Payments\PaymentGateway;
@@ -79,6 +80,7 @@ class AppServiceProvider extends ServiceProvider
             if ($event->user instanceof User) {
                 $event->user->last_login_at = now();
                 $event->user->saveQuietly();
+                AuditLog::record('staff.login', "{$event->user->email} logged in", $event->user, [], $event->user);
             }
         });
     }

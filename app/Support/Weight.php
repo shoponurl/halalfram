@@ -72,7 +72,11 @@ final class Weight implements JsonSerializable, Stringable
         return new self(self::round(bcdiv($this->pounds, bcdiv($percent, '100', 10), 10)));
     }
 
-    /** Percentage difference from an estimate, e.g. "10.000" for +10 %. */
+    /**
+     * Percentage difference from an estimate, e.g. "10.000" for +10 %.
+     *
+     * @return numeric-string
+     */
     public function variancePercentFrom(self $estimate): string
     {
         if (bccomp($estimate->pounds, '0', self::SCALE) === 0) {

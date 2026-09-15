@@ -69,4 +69,13 @@ return [
     // Cash on pickup is capped so a no-show can't leave too much wasted, never-billed product on the
     // books — start narrow; raise it once the real no-show rate is known.
     'cod_max_order_cents' => 15000, // $150
+
+    // Owner decision (guideline ch. 7, S07, recorded 2026-09-15): USDA-inspected facility. Bump the
+    // version string whenever the checkout notice text changes, so Order.regulatory_consent_version
+    // records exactly which wording a customer agreed to.
+    'regulatory_notice_version' => 'v1-2026-09-15',
+
+    // Real USDA establishment number, once assigned — left null until the owner adds it (never
+    // fabricated). Optional: shown in the checkout notice and footer only when present.
+    'usda_establishment_number' => env('USDA_ESTABLISHMENT_NUMBER'),
 ];

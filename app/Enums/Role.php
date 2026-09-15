@@ -40,7 +40,7 @@ enum Role: string
             self::Manager => [
                 Permission::AccessAdmin, Permission::ManageCatalog, Permission::ManageInventory, Permission::ViewOrders, Permission::ManageOrders,
                 Permission::RecordWeights, Permission::ApproveAdjustments, Permission::ManageDeliveries,
-                Permission::ViewReports, Permission::ViewAuditLog,
+                Permission::ViewReports, Permission::ViewAuditLog, Permission::ManageCompliance,
             ],
             self::FrontDesk => [Permission::AccessAdmin, Permission::ViewOrders, Permission::ManageOrders],
             self::Butcher => [Permission::AccessAdmin, Permission::ViewOrders, Permission::RecordWeights, Permission::ManageInventory],

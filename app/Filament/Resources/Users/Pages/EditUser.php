@@ -6,6 +6,7 @@ namespace App\Filament\Resources\Users\Pages;
 
 use App\Enums\Role;
 use App\Filament\Resources\Users\UserResource;
+use App\Models\AuditLog;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
@@ -40,6 +41,8 @@ class EditUser extends EditRecord
             $isSelf = $record->is(auth()->user());
             $newRole = $isSelf ? null : ($data['role'] ?? null);
             $newActive = $isSelf ? true : (bool) ($data['is_active'] ?? $record->is_active);
+            $oldRole = $record->getRoleNames()->first();
+            $oldActive = $record->is_active;
 
             // Never lock the business out: keep at least one active Owner
             $losesOwner = $record->isOwner() && (($newRole !== null && $newRole !== Role::Owner->value) || ! $newActive);
@@ -61,6 +64,18 @@ class EditUser extends EditRecord
 
             if ($newRole !== null) {
                 $record->syncRoles([$newRole]);
+            }
+
+            if ($oldRole !== $newRole || $oldActive !== $newActive) {
+                AuditLog::record(
+                    'staff.updated',
+                    "Updated staff account {$record->email}",
+                    $record,
+                    array_filter([
+                        'role' => $newRole !== null && $oldRole !== $newRole ? ['from' => $oldRole, 'to' => $newRole] : null,
+                        'is_active' => $oldActive !== $newActive ? ['from' => $oldActive, 'to' => $newActive] : null,
+                    ]),
+                );
             }
 
             return $record;

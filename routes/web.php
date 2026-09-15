@@ -8,6 +8,7 @@ use App\Http\Controllers\Shop\CheckoutController;
 use App\Http\Controllers\Shop\InvoiceController;
 use App\Http\Controllers\Shop\OrderController;
 use App\Http\Controllers\Shop\PayPalReturnController;
+use App\Http\Controllers\Shop\PrivacyRequestController;
 use App\Http\Controllers\Shop\ProductController;
 use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\TwilioWebhookController;
@@ -37,3 +38,9 @@ Route::view('/orders/{order}/balance-paid', 'shop.balance-paid')->name('orders.b
 
 Route::post('/stripe/webhook', StripeWebhookController::class)->name('stripe.webhook');
 Route::post('/webhooks/twilio/sms', TwilioWebhookController::class)->name('twilio.webhook');
+
+// Guideline ch. 7, S07: legal/compliance pages and the public CCPA request form.
+Route::view('/privacy', 'shop.legal.privacy')->name('legal.privacy');
+Route::view('/terms', 'shop.legal.terms')->name('legal.terms');
+Route::get('/privacy/requests', [PrivacyRequestController::class, 'create'])->name('privacy-requests.create');
+Route::post('/privacy/requests', [PrivacyRequestController::class, 'store'])->middleware('throttle:10,1')->name('privacy-requests.store');

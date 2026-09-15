@@ -14,10 +14,11 @@
     {{ $head ?? '' }}
 </head>
 <body class="min-h-screen bg-bone-100 font-sans text-ink-900 antialiased">
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-brand-800 focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-white">Skip to content</a>
     <header class="border-b border-bone-200 bg-bone-50/95">
         <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
             <a href="{{ route('home') }}" class="flex items-center gap-3">
-                <img src="{{ asset('halal-brothers-logo.jpg') }}" alt="" class="h-10 w-10 rounded-lg object-cover mix-blend-multiply" />
+                <img src="{{ asset('halal-brothers-logo.jpg') }}" alt="Halal Brothers logo" class="h-10 w-10 rounded-lg object-cover mix-blend-multiply" />
                 <span class="leading-tight">
                     <span class="block font-display text-lg font-bold text-brand-800">Halal Brothers</span>
                     <span class="block text-[11px] font-semibold uppercase tracking-[.16em] text-ink-500">Live poultry &amp; meat</span>
@@ -29,7 +30,7 @@
         </div>
     </header>
 
-    <main class="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+    <main id="main-content" class="mx-auto max-w-5xl px-4 py-10 sm:px-6">
         @if (session('status'))
             <p role="status" class="mb-6 rounded-2xl bg-halal-50 px-4 py-3 text-sm font-semibold text-halal-700">{{ session('status') }}</p>
         @endif
@@ -45,7 +46,32 @@
     </main>
 
     <footer class="border-t border-bone-200 py-8 text-center text-xs text-ink-500">
-        Halal Brothers · 3 Kelly Street, Lansdowne, PA 19050 · (267) 307-3777
+        <p>Halal Brothers · 3 Kelly Street, Lansdowne, PA 19050 · (267) 307-3777</p>
+        <p class="mt-2">
+            <a href="{{ route('legal.privacy') }}" class="underline hover:text-ink-700">Privacy policy</a>
+            · <a href="{{ route('legal.terms') }}" class="underline hover:text-ink-700">Terms</a>
+        </p>
     </footer>
+
+    {{-- CCPA/cookie notice (guideline ch. 7, S07): this site sets only the essential session/cart
+         cookie — no third-party analytics or ad trackers — so one dismissible notice is all that's
+         needed, no granular category toggles. --}}
+    <div id="cookie-notice" hidden class="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-2xl flex-wrap items-center gap-3 rounded-2xl bg-ink-900 px-5 py-4 text-sm text-white shadow-lg sm:inset-x-auto sm:right-4">
+        <p class="flex-1">We use only the essential cookies needed to run your cart and checkout — no ad trackers. See our <a href="{{ route('legal.privacy') }}" class="underline">privacy policy</a>.</p>
+        <button id="cookie-notice-dismiss" type="button" class="h-9 shrink-0 rounded-full bg-white px-4 text-xs font-bold text-ink-900 hover:bg-bone-100">Got it</button>
+    </div>
+    <script>
+        (() => {
+            const KEY = 'cookie-notice-dismissed';
+            const notice = document.getElementById('cookie-notice');
+            try {
+                if (!localStorage.getItem(KEY)) notice.hidden = false;
+            } catch (e) { notice.hidden = false; }
+            document.getElementById('cookie-notice-dismiss').addEventListener('click', () => {
+                notice.hidden = true;
+                try { localStorage.setItem(KEY, '1'); } catch (e) {}
+            });
+        })();
+    </script>
 </body>
 </html>

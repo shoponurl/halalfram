@@ -71,6 +71,21 @@ $paymentsConfigRoutes = [
     'store-credit.list' => fn () => '/admin/store-credit-accounts',
     'notification-templates.list' => fn () => '/admin/notification-templates',
 ];
+$reportRoutes = [
+    'reports.yield' => fn () => '/admin/yield-report',
+    'reports.margin' => fn () => '/admin/margin-report',
+    'reports.wastage' => fn () => '/admin/wastage-report',
+    'reports.sales' => fn () => '/admin/sales-report',
+    'reports.stock-aging' => fn () => '/admin/stock-aging-report',
+    'audit-log.list' => fn () => '/admin/audit-logs',
+];
+$complianceOnlyRoutes = [
+    'privacy-requests.list' => fn () => '/admin/privacy-requests',
+    'inspection-pack' => fn () => '/admin/inspection-pack',
+];
+$phoneOrderRoutes = [
+    'phone-order' => fn () => '/admin/phone-order',
+];
 
 // Only Owner, Manager, Front desk, Butcher and Accountant have orders.view (App\Enums\Role::permissions())
 $canViewOrders = [Role::Owner, Role::Manager, Role::FrontDesk, Role::Butcher, Role::Accountant];
@@ -157,6 +172,39 @@ foreach (Role::cases() as $role) {
 foreach (Role::cases() as $role) {
     $expected = in_array($role, $canManageCatalog, true) ? 200 : 403;
     foreach ($paymentsConfigRoutes as $name => $url) {
+        it("returns {$expected} for {$role->label()} on {$name}", function () use ($role, $url, $expected) {
+            $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
+        });
+    }
+}
+
+// Owner, Manager and Accountant have reports.view and audit.view (App\Enums\Role::permissions())
+$canViewReports = [Role::Owner, Role::Manager, Role::Accountant];
+foreach (Role::cases() as $role) {
+    $expected = in_array($role, $canViewReports, true) ? 200 : 403;
+    foreach ($reportRoutes as $name => $url) {
+        it("returns {$expected} for {$role->label()} on {$name}", function () use ($role, $url, $expected) {
+            $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
+        });
+    }
+}
+
+// Only Owner and Manager have compliance.manage — privacy requests and the inspection pack are
+// manager-level, guideline ch. 6, Sprint 07
+foreach (Role::cases() as $role) {
+    $expected = in_array($role, $canManageCatalog, true) ? 200 : 403;
+    foreach ($complianceOnlyRoutes as $name => $url) {
+        it("returns {$expected} for {$role->label()} on {$name}", function () use ($role, $url, $expected) {
+            $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
+        });
+    }
+}
+
+// Owner, Manager and Front desk have orders.manage — phone/counter order entry, guideline S07
+$canManageOrders = [Role::Owner, Role::Manager, Role::FrontDesk];
+foreach (Role::cases() as $role) {
+    $expected = in_array($role, $canManageOrders, true) ? 200 : 403;
+    foreach ($phoneOrderRoutes as $name => $url) {
         it("returns {$expected} for {$role->label()} on {$name}", function () use ($role, $url, $expected) {
             $this->actingAs(staff($role))->get($url($this))->assertStatus($expected);
         });

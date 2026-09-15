@@ -53,6 +53,7 @@ final class PlaceOrder extends Action
      * @param  int  $expectedHoldCents  the hold the customer saw (including delivery fee, tax and any store credit); any difference means prices changed or were tampered with
      * @param  array{method?: string, address_line1?: string, address_line2?: string|null, city?: string, state?: string, zip?: string, delivery_slot_id?: int}  $fulfilment  defaults to store pickup
      * @param  string  $paymentMethod  card | paypal | cash — cash is pickup-only, capped at config('catchweight.cod_max_order_cents') (owner decision, guideline ch. 7, S06)
+     * @param  bool  $regulatoryConsent  the USDA/PA disclosure was shown and accepted (guideline ch. 7, S07). Defaults true for internal callers (phone/counter orders, tests) that already disclosed it outside the web checkout form; CheckoutRequest requires the real checkbox before the web path ever reaches here.
      * @return array{order: Order, token: string}
      */
     public function handle(
@@ -64,6 +65,7 @@ final class PlaceOrder extends Action
         string $paymentMethod = 'card',
         ?string $couponCode = null,
         bool $applyStoreCredit = false,
+        bool $regulatoryConsent = true,
     ): array {
         if ($lines === []) {
             throw ValidationException::withMessages(['cart' => 'Your cart is empty.']);
@@ -71,7 +73,7 @@ final class PlaceOrder extends Action
 
         $token = Str::random(48);
 
-        $order = $this->transaction(function () use ($lines, $customer, $fulfilment, $expectedHoldCents, $user, $token, $paymentMethod, $couponCode, $applyStoreCredit): Order {
+        $order = $this->transaction(function () use ($lines, $customer, $fulfilment, $expectedHoldCents, $user, $token, $paymentMethod, $couponCode, $applyStoreCredit, $regulatoryConsent): Order {
             $quote = $this->quote->handle($lines, lockProducts: true);
 
             $isDelivery = ($fulfilment['method'] ?? 'pickup') === 'delivery';
@@ -154,6 +156,8 @@ final class PlaceOrder extends Action
             $order->tax_cents = $taxCents;
             $order->coupon_id = $coupon?->id;
             $order->store_credit_applied_cents = $creditAppliedCents;
+            $order->regulatory_consent_at = $regulatoryConsent ? now() : null;
+            $order->regulatory_consent_version = $regulatoryConsent ? (string) config('catchweight.regulatory_notice_version') : null;
             if ($isDelivery) {
                 $order->delivery_zone_id = $deliveryZone?->id;
                 $order->delivery_slot_id = $deliverySlot?->id;

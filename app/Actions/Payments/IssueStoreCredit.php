@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Actions\Payments;
 
 use App\Actions\Action;
+use App\Models\AuditLog;
 use App\Models\StoreCreditAccount;
 use App\Models\StoreCreditEvent;
 use App\Models\User;
+use App\Support\Cents;
 
 /** Staff-initiated credit — goodwill, or a refund the customer preferred to keep in the store. */
 final class IssueStoreCredit extends Action
@@ -26,6 +28,14 @@ final class IssueStoreCredit extends Action
             $event = new StoreCreditEvent;
             $event->fill(['customer_email' => $customerEmail, 'type' => 'issue', 'amount_cents' => $amountCents, 'reason' => $reason, 'created_by' => $by->id]);
             $event->save();
+
+            AuditLog::record(
+                'store_credit.issued',
+                'Issued '.Cents::format($amountCents)." store credit to {$customerEmail}: {$reason}",
+                $account,
+                ['amount_cents' => $amountCents],
+                $by,
+            );
 
             return $account;
         });

@@ -30,6 +30,8 @@ use Illuminate\Support\Str;
  * @property string $customer_phone
  * @property bool $marketing_sms_opt_in
  * @property bool $marketing_email_opt_in
+ * @property Carbon|null $regulatory_consent_at
+ * @property string|null $regulatory_consent_version
  * @property string $payment_method
  * @property string|null $payment_reference
  * @property int $tax_cents
@@ -114,6 +116,7 @@ class Order extends Model
             'fulfilment_status' => FulfilmentStatus::class,
             'marketing_sms_opt_in' => 'boolean',
             'marketing_email_opt_in' => 'boolean',
+            'regulatory_consent_at' => 'datetime',
             'tax_cents' => 'integer',
             'discount_cents' => 'integer',
             'store_credit_applied_cents' => 'integer',

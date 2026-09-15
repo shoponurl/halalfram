@@ -18,6 +18,7 @@ beforeEach(function () {
         'customer_email' => 'buyer@example.com',
         'customer_phone' => '267-555-0123',
         'agree_catch_weight' => '1',
+        'agree_regulatory_notice' => '1',
         'expected_hold_cents' => 1100,
         'fulfilment_method' => 'pickup',
         'payment_method' => 'card',
@@ -59,7 +60,7 @@ it('rejects a request that tries to smuggle tax, a discount or store credit into
 
 it('rejects checkout when the posted hold no longer matches the server price', function () {
     withCartLine($this)
-        ->post('/checkout', ['customer_name' => 'Test Buyer', 'customer_email' => 'buyer@example.com', 'customer_phone' => '267-555-0123', 'agree_catch_weight' => '1', 'expected_hold_cents' => 1, 'fulfilment_method' => 'pickup', 'payment_method' => 'card'])
+        ->post('/checkout', ['customer_name' => 'Test Buyer', 'customer_email' => 'buyer@example.com', 'customer_phone' => '267-555-0123', 'agree_catch_weight' => '1', 'agree_regulatory_notice' => '1', 'expected_hold_cents' => 1, 'fulfilment_method' => 'pickup', 'payment_method' => 'card'])
         ->assertSessionHasErrors('cart');
 
     expect(Order::query()->count())->toBe(0);

@@ -65,6 +65,7 @@ final class CheckoutController extends Controller
             'deliveryFeeCents' => $deliveryZone->flat_fee_cents ?? 0,
             'creditEmail' => $creditEmail,
             'availableCreditCents' => $availableCreditCents,
+            'usdaEstablishmentNumber' => config('catchweight.usda_establishment_number'),
         ]);
     }
 
@@ -97,6 +98,7 @@ final class CheckoutController extends Controller
             paymentMethod: (string) $data['payment_method'],
             couponCode: $data['coupon_code'] ?? null,
             applyStoreCredit: (bool) ($data['apply_store_credit'] ?? false),
+            regulatoryConsent: true,   // CheckoutRequest already requires agree_regulatory_notice to be accepted
         );
 
         $order = $result['order'];

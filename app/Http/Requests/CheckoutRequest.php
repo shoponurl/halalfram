@@ -23,6 +23,8 @@ final class CheckoutRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:500'],
             'expected_hold_cents' => ['required', 'integer', 'min:0'],
             'agree_catch_weight' => ['accepted'],
+            // Owner decision (guideline ch. 7, S07): USDA/PA regulatory disclosure, recorded on the order.
+            'agree_regulatory_notice' => ['accepted'],
             'fulfilment_method' => ['required', 'in:pickup,delivery'],
             'delivery_address_line1' => ['required_if:fulfilment_method,delivery', 'nullable', 'string', 'max:190'],
             'delivery_address_line2' => ['nullable', 'string', 'max:190'],
@@ -56,6 +58,7 @@ final class CheckoutRequest extends FormRequest
     {
         return [
             'agree_catch_weight.accepted' => 'Please confirm you understand the final price is based on actual weight.',
+            'agree_regulatory_notice.accepted' => 'Please confirm you\'ve read the USDA inspection notice.',
             'customer_phone.regex' => 'Please enter a valid phone number.',
             'delivery_zip.regex' => 'Please enter a 5-digit zip code.',
         ];

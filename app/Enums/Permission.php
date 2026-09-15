@@ -18,4 +18,5 @@ enum Permission: string
     case ManageDeliveries = 'deliveries.manage';
     case ViewReports = 'reports.view';
     case ViewAuditLog = 'audit.view';
+    case ManageCompliance = 'compliance.manage';   // inspection pack, privacy/CCPA requests (guideline S07)
 }
